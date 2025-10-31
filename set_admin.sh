@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #################################################
-# Fix Admin Rights in Telegram Bot
-# Usage: ./fix_admin.sh USER_ID
+# Set Admin Rights in Telegram Bot
+# Usage: ./set_admin.sh USER_ID
 #################################################
 
 set -e
@@ -35,7 +35,7 @@ fi
 USER_ID=$1
 BOT_DIR="/opt/telegram-bot"
 
-print_info "Fixing admin rights for user ID: $USER_ID"
+print_info "Setting admin rights for user ID: $USER_ID"
 
 # Check if bot directory exists
 if [ ! -d "$BOT_DIR" ]; then
