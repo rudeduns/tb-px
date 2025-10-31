@@ -164,8 +164,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Log usage
         cost = db.log_usage(user_id, config.CLAUDE_MODEL, input_tokens, output_tokens)
 
-        # Send response
-        await update.message.reply_text(response_text, parse_mode=ParseMode.MARKDOWN)
+        # Send response - try with Markdown, fallback to plain text if parsing fails
+        try:
+            await update.message.reply_text(response_text, parse_mode=ParseMode.MARKDOWN)
+        except Exception as parse_error:
+            # Markdown parsing failed, send as plain text
+            logger.warning(f"Markdown parse error for user {user_id}: {parse_error}")
+            await update.message.reply_text(response_text)
 
         # Log for admin
         logger.info(f"User {user_id} - Tokens: {input_tokens}+{output_tokens}, Cost: ${cost:.4f}")
@@ -218,8 +223,13 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Log usage
         cost = db.log_usage(user_id, config.CLAUDE_MODEL, input_tokens, output_tokens)
 
-        # Send response
-        await update.message.reply_text(response_text, parse_mode=ParseMode.MARKDOWN)
+        # Send response - try with Markdown, fallback to plain text if parsing fails
+        try:
+            await update.message.reply_text(response_text, parse_mode=ParseMode.MARKDOWN)
+        except Exception as parse_error:
+            # Markdown parsing failed, send as plain text
+            logger.warning(f"Markdown parse error for user {user_id} (image): {parse_error}")
+            await update.message.reply_text(response_text)
 
         logger.info(f"User {user_id} - Image - Tokens: {input_tokens}+{output_tokens}, Cost: ${cost:.4f}")
 
@@ -289,8 +299,13 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Log usage
         cost = db.log_usage(user_id, config.CLAUDE_MODEL, input_tokens, output_tokens)
 
-        # Send response
-        await update.message.reply_text(response_text, parse_mode=ParseMode.MARKDOWN)
+        # Send response - try with Markdown, fallback to plain text if parsing fails
+        try:
+            await update.message.reply_text(response_text, parse_mode=ParseMode.MARKDOWN)
+        except Exception as parse_error:
+            # Markdown parsing failed, send as plain text
+            logger.warning(f"Markdown parse error for user {user_id} (document): {parse_error}")
+            await update.message.reply_text(response_text)
 
         logger.info(f"User {user_id} - Document - Tokens: {input_tokens}+{output_tokens}, Cost: ${cost:.4f}")
 
