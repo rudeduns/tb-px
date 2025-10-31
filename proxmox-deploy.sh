@@ -112,8 +112,22 @@ CT_MEMORY=${CT_MEMORY:-$CT_MEMORY_DEFAULT}
 read -p "Enter disk size in GB [${CT_DISK_DEFAULT}]: " CT_DISK
 CT_DISK=${CT_DISK:-$CT_DISK_DEFAULT}
 
-read -p "Enter storage [${CT_STORAGE_DEFAULT}]: " CT_STORAGE
+# Show available storages
+echo ""
+print_info "Available storages:"
+pvesm status | grep -E "^(local|local-lvm|local-zfs)" | awk '{print "  - " $1 " (" $2 ")"}'
+echo ""
+
+read -p "Enter storage name [${CT_STORAGE_DEFAULT}]: " CT_STORAGE
 CT_STORAGE=${CT_STORAGE:-$CT_STORAGE_DEFAULT}
+
+# Validate storage exists
+if ! pvesm status | grep -q "^${CT_STORAGE} "; then
+    print_error "Storage '${CT_STORAGE}' does not exist!"
+    print_info "Available storages:"
+    pvesm status | awk 'NR>1 {print "  - " $1}'
+    exit 1
+fi
 
 print_step "Bot Configuration"
 
