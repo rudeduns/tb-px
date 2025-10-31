@@ -165,7 +165,7 @@ telegram-bot/
 ├── .env.example           # Пример конфигурации
 ├── install.sh             # Скрипт установки
 ├── proxmox-deploy.sh      # Автоматическая установка на Proxmox
-├── fix_admin.sh           # Скрипт исправления прав админа
+├── set_admin.sh           # Скрипт установки прав администратора
 ├── README.md              # Документация
 ├── QUICKSTART.md          # Быстрый старт
 └── CLAUDE.md              # Техническая документация
@@ -236,21 +236,21 @@ sudo rm /opt/telegram-bot/bot_data.db
 sudo systemctl restart telegram-bot
 ```
 
-### Проблемы с правами администратора
+### Добавление администратора
 
-Если после `/start` бот пишет "У вас нет доступа", используйте скрипт исправления:
+Чтобы назначить пользователя администратором:
 
 ```bash
 # На Proxmox хосте
-pct exec CONTAINER_ID -- curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/fix_admin.sh -o /tmp/fix_admin.sh
-pct exec CONTAINER_ID -- bash /tmp/fix_admin.sh ВАШ_TELEGRAM_ID
+pct exec CONTAINER_ID -- curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/set_admin.sh -o /tmp/set_admin.sh
+pct exec CONTAINER_ID -- bash /tmp/set_admin.sh ВАШ_TELEGRAM_ID
 
 # Или внутри контейнера
-curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/fix_admin.sh -o /tmp/fix_admin.sh
-bash /tmp/fix_admin.sh ВАШ_TELEGRAM_ID
+curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/set_admin.sh -o /tmp/set_admin.sh
+bash /tmp/set_admin.sh ВАШ_TELEGRAM_ID
 ```
 
-Скрипт автоматически обновит .env и базу данных с правильными правами.
+Скрипт обновит .env и базу данных с правами администратора.
 
 ## Требования
 

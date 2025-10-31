@@ -209,10 +209,10 @@ DATABASE_PATH - Default: bot_data.db
 
 **Fixed in:** database.py:95-111 - now uses `INSERT ... ON CONFLICT` to preserve `is_admin` and `is_authorized` flags
 
-**Quick fix:** Use `fix_admin.sh`:
+**Solution:** Use `set_admin.sh`:
 ```bash
-curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/fix_admin.sh -o /tmp/fix_admin.sh
-bash /tmp/fix_admin.sh USER_ID
+curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/set_admin.sh -o /tmp/set_admin.sh
+bash /tmp/set_admin.sh USER_ID
 ```
 
 ### Common Issues

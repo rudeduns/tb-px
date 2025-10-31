@@ -108,17 +108,17 @@ systemctl restart telegram-bot
 
 ## Решение проблем
 
-### "У вас нет доступа к боту" после /start
+### Добавление администратора
 
-Если вы указали правильный ADMIN_USER_ID при установке, но бот не дает доступ, используйте скрипт исправления:
+Чтобы назначить пользователя администратором:
 
 ```bash
-# Скачайте и запустите fix_admin.sh
-curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/fix_admin.sh -o /tmp/fix_admin.sh
-pct exec CONTAINER_ID -- bash /tmp/fix_admin.sh ВАШ_TELEGRAM_ID
+# Скачайте и запустите set_admin.sh
+curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/set_admin.sh -o /tmp/set_admin.sh
+pct exec CONTAINER_ID -- bash /tmp/set_admin.sh ВАШ_TELEGRAM_ID
 ```
 
-Скрипт обновит базу данных и .env файл с правильными правами.
+Скрипт обновит базу данных и .env файл с правами администратора.
 
 ### Бот не отвечает в Telegram:
 
