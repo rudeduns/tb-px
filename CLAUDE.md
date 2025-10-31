@@ -199,6 +199,32 @@ DATABASE_PATH - Default: bot_data.db
 - User-friendly error messages sent to Telegram
 - No retry logic (consider adding for transient API errors)
 
+## Troubleshooting
+
+### Admin Rights Issues
+
+**Problem:** User shows as authorized in database but bot denies access on `/start`
+
+**Cause:** The `add_user()` function was using `INSERT OR REPLACE` which overwrites the entire row, resetting `is_admin` to 0 on every `/start` call.
+
+**Fixed in:** database.py:95-111 - now uses `INSERT ... ON CONFLICT` to preserve `is_admin` and `is_authorized` flags
+
+**Quick fix:** Use `fix_admin.sh`:
+```bash
+curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/fix_admin.sh -o /tmp/fix_admin.sh
+bash /tmp/fix_admin.sh USER_ID
+```
+
+### Common Issues
+
+**httpx/anthropic version conflict:**
+- Error: `TypeError: Client.__init__() got an unexpected keyword argument 'proxies'`
+- Solution: Update packages: `pip install --upgrade anthropic==0.40.0 httpx==0.27.2`
+
+**Storage validation error in proxmox-deploy.sh:**
+- Script now shows available storages and validates input
+- Use storage name like "local-lvm", not numbers
+
 ## Common Modifications
 
 ### Adding New Commands

@@ -156,16 +156,19 @@ sudo journalctl -u telegram-bot -n 50 --no-pager
 
 ```
 telegram-bot/
-├── bot.py              # Основной файл бота
-├── admin.py            # Команды администратора
-├── config.py           # Конфигурация
-├── database.py         # Работа с БД
-├── claude_client.py    # Клиент Claude API
-├── requirements.txt    # Зависимости Python
-├── .env.example        # Пример конфигурации
-├── install.sh          # Скрипт установки
-├── proxmox-setup.sh    # Скрипт для Proxmox
-└── README.md           # Документация
+├── bot.py                 # Основной файл бота
+├── admin.py               # Команды администратора
+├── config.py              # Конфигурация
+├── database.py            # Работа с БД
+├── claude_client.py       # Клиент Claude API
+├── requirements.txt       # Зависимости Python
+├── .env.example           # Пример конфигурации
+├── install.sh             # Скрипт установки
+├── proxmox-deploy.sh      # Автоматическая установка на Proxmox
+├── fix_admin.sh           # Скрипт исправления прав админа
+├── README.md              # Документация
+├── QUICKSTART.md          # Быстрый старт
+└── CLAUDE.md              # Техническая документация
 ```
 
 ## База данных
@@ -218,6 +221,22 @@ sudo chown -R telegram-bot:telegram-bot /opt/telegram-bot
 sudo rm /opt/telegram-bot/bot_data.db
 sudo systemctl restart telegram-bot
 ```
+
+### Проблемы с правами администратора
+
+Если после `/start` бот пишет "У вас нет доступа", используйте скрипт исправления:
+
+```bash
+# На Proxmox хосте
+pct exec CONTAINER_ID -- curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/fix_admin.sh -o /tmp/fix_admin.sh
+pct exec CONTAINER_ID -- bash /tmp/fix_admin.sh ВАШ_TELEGRAM_ID
+
+# Или внутри контейнера
+curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/fix_admin.sh -o /tmp/fix_admin.sh
+bash /tmp/fix_admin.sh ВАШ_TELEGRAM_ID
+```
+
+Скрипт автоматически обновит .env и базу данных с правильными правами.
 
 ## Требования
 
