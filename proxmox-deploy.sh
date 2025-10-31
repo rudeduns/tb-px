@@ -10,6 +10,9 @@
 
 set -e
 
+# Redirect stdin to /dev/tty for interactive input when piped
+exec < /dev/tty
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -75,13 +78,13 @@ CT_STORAGE_DEFAULT="local-lvm"
 print_step "Container Configuration"
 
 # Ask for container ID
-read -p "Enter container ID [${CT_ID_DEFAULT}]: " CT_ID < /dev/tty
+read -p "Enter container ID [${CT_ID_DEFAULT}]: " CT_ID
 CT_ID=${CT_ID:-$CT_ID_DEFAULT}
 
 # Check if container already exists
 if pct status $CT_ID &>/dev/null; then
     print_error "Container $CT_ID already exists!"
-    read -p "Do you want to destroy it and create new? (yes/no): " DESTROY < /dev/tty
+    read -p "Do you want to destroy it and create new? (yes/no): " DESTROY
     if [ "$DESTROY" = "yes" ]; then
         print_warn "Stopping and destroying container $CT_ID..."
         pct stop $CT_ID 2>/dev/null || true
@@ -95,52 +98,52 @@ if pct status $CT_ID &>/dev/null; then
 fi
 
 # Ask for other container parameters
-read -p "Enter hostname [${CT_HOSTNAME_DEFAULT}]: " CT_HOSTNAME < /dev/tty
+read -p "Enter hostname [${CT_HOSTNAME_DEFAULT}]: " CT_HOSTNAME
 CT_HOSTNAME=${CT_HOSTNAME:-$CT_HOSTNAME_DEFAULT}
 
-read -p "Enter root password [${CT_PASSWORD_DEFAULT}]: " CT_PASSWORD < /dev/tty
+read -p "Enter root password [${CT_PASSWORD_DEFAULT}]: " CT_PASSWORD
 CT_PASSWORD=${CT_PASSWORD:-$CT_PASSWORD_DEFAULT}
 
-read -p "Enter CPU cores [${CT_CORES_DEFAULT}]: " CT_CORES < /dev/tty
+read -p "Enter CPU cores [${CT_CORES_DEFAULT}]: " CT_CORES
 CT_CORES=${CT_CORES:-$CT_CORES_DEFAULT}
 
-read -p "Enter RAM in MB [${CT_MEMORY_DEFAULT}]: " CT_MEMORY < /dev/tty
+read -p "Enter RAM in MB [${CT_MEMORY_DEFAULT}]: " CT_MEMORY
 CT_MEMORY=${CT_MEMORY:-$CT_MEMORY_DEFAULT}
 
-read -p "Enter disk size in GB [${CT_DISK_DEFAULT}]: " CT_DISK < /dev/tty
+read -p "Enter disk size in GB [${CT_DISK_DEFAULT}]: " CT_DISK
 CT_DISK=${CT_DISK:-$CT_DISK_DEFAULT}
 
-read -p "Enter storage [${CT_STORAGE_DEFAULT}]: " CT_STORAGE < /dev/tty
+read -p "Enter storage [${CT_STORAGE_DEFAULT}]: " CT_STORAGE
 CT_STORAGE=${CT_STORAGE:-$CT_STORAGE_DEFAULT}
 
 print_step "Bot Configuration"
 
 # Ask for Telegram bot token
 echo -e "${YELLOW}Get your bot token from @BotFather in Telegram${NC}"
-read -p "Enter Telegram Bot Token: " TELEGRAM_BOT_TOKEN < /dev/tty
+read -p "Enter Telegram Bot Token: " TELEGRAM_BOT_TOKEN
 while [ -z "$TELEGRAM_BOT_TOKEN" ]; do
     print_error "Bot token cannot be empty!"
-    read -p "Enter Telegram Bot Token: " TELEGRAM_BOT_TOKEN < /dev/tty
+    read -p "Enter Telegram Bot Token: " TELEGRAM_BOT_TOKEN
 done
 
 # Ask for Claude API key
 echo -e "${YELLOW}Get your API key from https://console.anthropic.com/${NC}"
-read -p "Enter Claude API Key: " CLAUDE_API_KEY < /dev/tty
+read -p "Enter Claude API Key: " CLAUDE_API_KEY
 while [ -z "$CLAUDE_API_KEY" ]; do
     print_error "API key cannot be empty!"
-    read -p "Enter Claude API Key: " CLAUDE_API_KEY < /dev/tty
+    read -p "Enter Claude API Key: " CLAUDE_API_KEY
 done
 
 # Ask for admin user ID
 echo -e "${YELLOW}Get your Telegram user ID from @userinfobot${NC}"
-read -p "Enter Admin Telegram User ID: " ADMIN_USER_ID < /dev/tty
+read -p "Enter Admin Telegram User ID: " ADMIN_USER_ID
 while [ -z "$ADMIN_USER_ID" ]; do
     print_error "Admin user ID cannot be empty!"
-    read -p "Enter Admin Telegram User ID: " ADMIN_USER_ID < /dev/tty
+    read -p "Enter Admin Telegram User ID: " ADMIN_USER_ID
 done
 
 # Optional: Claude model
-read -p "Enter Claude model [claude-3-5-sonnet-20241022]: " CLAUDE_MODEL < /dev/tty
+read -p "Enter Claude model [claude-3-5-sonnet-20241022]: " CLAUDE_MODEL
 CLAUDE_MODEL=${CLAUDE_MODEL:-claude-3-5-sonnet-20241022}
 
 print_step "Summary"
@@ -159,7 +162,7 @@ echo "  Admin User ID: $ADMIN_USER_ID"
 echo "  Claude Model: $CLAUDE_MODEL"
 echo ""
 
-read -p "Proceed with installation? (yes/no): " CONFIRM < /dev/tty
+read -p "Proceed with installation? (yes/no): " CONFIRM
 if [ "$CONFIRM" != "yes" ]; then
     print_error "Installation cancelled"
     exit 1
