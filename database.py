@@ -97,10 +97,15 @@ class Database:
         """Add or update user information."""
         conn = self.get_connection()
         cursor = conn.cursor()
+        # Use INSERT ... ON CONFLICT to preserve is_admin when updating
         cursor.execute("""
-            INSERT OR REPLACE INTO users
-            (user_id, username, first_name, last_name, is_authorized, last_active)
+            INSERT INTO users (user_id, username, first_name, last_name, is_authorized, last_active)
             VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id) DO UPDATE SET
+                username = excluded.username,
+                first_name = excluded.first_name,
+                last_name = excluded.last_name,
+                last_active = CURRENT_TIMESTAMP
         """, (user_id, username, first_name, last_name, int(is_authorized)))
         conn.commit()
         conn.close()
