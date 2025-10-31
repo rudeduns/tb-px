@@ -214,6 +214,20 @@ sudo chown -R telegram-bot:telegram-bot /opt/telegram-bot
 - Проверьте баланс Claude API
 - Проверьте лимиты API
 
+### Ошибки форматирования сообщений
+
+Если бот отвечает `❌ Произошла ошибка при обработке сообщения: Can't parse entities`:
+
+**Причина:** Claude генерирует текст со спецсимволами Markdown которые ломают парсер Telegram
+
+**Решение:** Обновите до последней версии бота:
+```bash
+pct exec CONTAINER_ID -- curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/bot.py -o /opt/telegram-bot/bot.py
+pct exec CONTAINER_ID -- systemctl restart telegram-bot
+```
+
+Новая версия автоматически отправляет plain text при ошибках парсинга.
+
 ### База данных
 
 ```bash

@@ -225,6 +225,12 @@ bash /tmp/fix_admin.sh USER_ID
 - Script now shows available storages and validates input
 - Use storage name like "local-lvm", not numbers
 
+**Markdown parsing errors in responses:**
+- Error: `Can't parse entities: can't find end of the entity starting at byte offset XXXX`
+- Cause: Claude generates text with Markdown special characters that break Telegram's parser
+- Solution: bot.py now tries to send with Markdown, falls back to plain text on parse errors
+- Fixed in: bot.py:168-173, 226-232, 302-308
+
 ## Common Modifications
 
 ### Adding New Commands
