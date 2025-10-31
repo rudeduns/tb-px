@@ -50,10 +50,12 @@ curl -I https://raw.githubusercontent.com/rudeduns/tb-px/main/proxmox-deploy.sh
 
 ## Шаг 5: Готово!
 
-Теперь можно использовать одну команду для установки:
+Теперь можно использовать автоматическую установку:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/proxmox-deploy.sh | bash
+curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/proxmox-deploy.sh -o proxmox-deploy.sh
+chmod +x proxmox-deploy.sh
+./proxmox-deploy.sh
 ```
 
 ## Альтернатива: Использование без GitHub

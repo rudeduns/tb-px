@@ -14,12 +14,14 @@ Telegram бот с интеграцией Claude AI, поддерживающи�
 
 ## Быстрый старт
 
-### Метод 1: Одна команда для Proxmox (РЕКОМЕНДУЕТСЯ) 🚀
+### Метод 1: Автоматическая установка на Proxmox (РЕКОМЕНДУЕТСЯ) 🚀
 
 Подключитесь к Proxmox хосту по SSH и выполните:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/proxmox-deploy.sh | bash
+curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/proxmox-deploy.sh -o proxmox-deploy.sh
+chmod +x proxmox-deploy.sh
+./proxmox-deploy.sh
 ```
 
 Скрипт интерактивно спросит все необходимые параметры:

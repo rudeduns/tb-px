@@ -55,11 +55,13 @@ python bot.py
 ### Deployment Commands
 
 ```bash
-# One-command Proxmox deployment (RECOMMENDED)
+# Proxmox deployment (RECOMMENDED)
 # Run on Proxmox host - creates container, installs bot, configures everything
-curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/proxmox-deploy.sh | bash
+curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/proxmox-deploy.sh -o proxmox-deploy.sh
+chmod +x proxmox-deploy.sh
+./proxmox-deploy.sh
 
-# Or download and run manually
+# Or with wget
 wget https://raw.githubusercontent.com/rudeduns/tb-px/main/proxmox-deploy.sh
 chmod +x proxmox-deploy.sh
 ./proxmox-deploy.sh

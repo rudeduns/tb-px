@@ -4,14 +4,13 @@
 # Telegram Bot with Claude AI
 # One-Click Proxmox Deployment Script
 #################################################
-# Usage: wget -qO- https://raw.githubusercontent.com/YOUR_REPO/main/proxmox-deploy.sh | bash
-# Or: curl -sSL https://raw.githubusercontent.com/YOUR_REPO/main/proxmox-deploy.sh | bash
+# Usage:
+#   curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/proxmox-deploy.sh -o proxmox-deploy.sh
+#   chmod +x proxmox-deploy.sh
+#   ./proxmox-deploy.sh
 #################################################
 
 set -e
-
-# Redirect stdin to /dev/tty for interactive input when piped
-exec < /dev/tty
 
 # Colors
 RED='\033[0;31m'

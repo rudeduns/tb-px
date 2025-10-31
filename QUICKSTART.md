@@ -1,17 +1,21 @@
 # Быстрый старт для Proxmox
 
-## Одна команда для полной установки
+## Автоматическая установка
 
 Подключитесь к вашему Proxmox серверу по SSH и выполните:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/proxmox-deploy.sh | bash
+curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/proxmox-deploy.sh -o proxmox-deploy.sh
+chmod +x proxmox-deploy.sh
+./proxmox-deploy.sh
 ```
 
 Или с wget:
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/rudeduns/tb-px/main/proxmox-deploy.sh | bash
+wget https://raw.githubusercontent.com/rudeduns/tb-px/main/proxmox-deploy.sh
+chmod +x proxmox-deploy.sh
+./proxmox-deploy.sh
 ```
 
 ## Что произойдет?

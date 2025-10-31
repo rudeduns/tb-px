@@ -3,7 +3,12 @@
     "allow": [
       "Bash(powershell -Command \"Get-ChildItem -Force\")",
       "Bash(powershell -Command \"Get-ChildItem -Force -Recurse | Select-Object Name, Length, LastWriteTime | Format-Table\")",
-      "Bash(powershell -Command:*)"
+      "Bash(powershell -Command:*)",
+      "Bash(git commit:*)",
+      "Bash(git branch:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
