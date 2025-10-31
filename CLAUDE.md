@@ -229,7 +229,14 @@ bash /tmp/set_admin.sh USER_ID
 - Error: `Can't parse entities: can't find end of the entity starting at byte offset XXXX`
 - Cause: Claude generates text with Markdown special characters that break Telegram's parser
 - Solution: bot.py now tries to send with Markdown, falls back to plain text on parse errors
-- Fixed in: bot.py:168-173, 226-232, 302-308
+- Fixed in: bot.py:208-222, 275-288, 358-371
+
+**Message too long errors:**
+- Error: `Message is too long`
+- Cause: Telegram has 4096 character limit per message
+- Solution: bot.py now automatically splits long responses into multiple messages
+- Implementation: `split_message()` function splits by paragraphs, then sentences if needed
+- Fixed in: bot.py:33-68 (split function), bot.py:209-222, 276-288, 359-371 (usage)
 
 ## Common Modifications
 

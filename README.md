@@ -228,6 +228,19 @@ pct exec CONTAINER_ID -- systemctl restart telegram-bot
 
 Новая версия автоматически отправляет plain text при ошибках парсинга.
 
+### Ошибка "Message is too long"
+
+Если бот не отвечает и в логах `Message is too long`:
+
+**Причина:** Claude генерирует ответ длиннее 4096 символов (лимит Telegram)
+
+**Решение:** Обновите до последней версии - бот автоматически разбивает длинные ответы на части:
+
+```bash
+pct exec CONTAINER_ID -- curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/bot.py -o /opt/telegram-bot/bot.py
+pct exec CONTAINER_ID -- systemctl restart telegram-bot
+```
+
 ### База данных
 
 ```bash
