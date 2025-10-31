@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -Command \"Get-ChildItem -Force\")",
+      "Bash(powershell -Command \"Get-ChildItem -Force -Recurse | Select-Object Name, Length, LastWriteTime | Format-Table\")",
+      "Bash(powershell -Command:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
