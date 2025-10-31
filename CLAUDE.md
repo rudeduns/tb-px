@@ -225,11 +225,12 @@ bash /tmp/set_admin.sh USER_ID
 - Script now shows available storages and validates input
 - Use storage name like "local-lvm", not numbers
 
-**Markdown parsing errors in responses:**
-- Error: `Can't parse entities: can't find end of the entity starting at byte offset XXXX`
-- Cause: Claude generates text with Markdown special characters that break Telegram's parser
-- Solution: bot.py now tries to send with Markdown, falls back to plain text on parse errors
-- Fixed in: bot.py:208-222, 275-288, 358-371
+**HTML formatting (v2.0):**
+- Switched from Markdown to HTML for better stability
+- HTML is less prone to parsing errors (no conflicts with `_`, `*`, `[`, etc.)
+- Telegram natively supports: `<b>`, `<i>`, `<code>`, `<pre>`, `<a href="">`, `<u>`, `<s>`
+- Falls back to plain text if HTML parsing fails
+- Implementation: bot.py and admin.py use `ParseMode.HTML` everywhere
 
 **Message too long errors:**
 - Error: `Message is too long`

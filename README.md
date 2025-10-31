@@ -216,17 +216,14 @@ sudo chown -R telegram-bot:telegram-bot /opt/telegram-bot
 
 ### Ошибки форматирования сообщений
 
-Если бот отвечает `❌ Произошла ошибка при обработке сообщения: Can't parse entities`:
+Бот использует HTML форматирование Telegram вместо Markdown для лучшей стабильности.
 
-**Причина:** Claude генерирует текст со спецсимволами Markdown которые ломают парсер Telegram
-
-**Решение:** Обновите до последней версии бота:
+Если все еще видите ошибки форматирования, обновите до последней версии:
 ```bash
 pct exec CONTAINER_ID -- curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/bot.py -o /opt/telegram-bot/bot.py
+pct exec CONTAINER_ID -- curl -sSL https://raw.githubusercontent.com/rudeduns/tb-px/main/admin.py -o /opt/telegram-bot/admin.py
 pct exec CONTAINER_ID -- systemctl restart telegram-bot
 ```
-
-Новая версия автоматически отправляет plain text при ошибках парсинга.
 
 ### Ошибка "Message is too long"
 
