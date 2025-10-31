@@ -240,6 +240,61 @@ async def total_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     await update.message.reply_text(stats_text, parse_mode=ParseMode.HTML)
 
 
+async def set_prompt_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Set system prompt for all conversations."""
+    user_id = update.effective_user.id
+
+    if not db.is_admin(user_id):
+        await update.message.reply_text("❌ У вас нет прав администратора.")
+        return
+
+    # Check if prompt text was provided
+    if not context.args:
+        await update.message.reply_text(
+            "❌ Использование: <code>/setprompt текст промпта</code>\n\n"
+            "Пример:\n"
+            "<code>/setprompt Ты - дружелюбный помощник. Отвечай кратко и по делу.</code>\n\n"
+            "Чтобы удалить промпт:\n"
+            "<code>/setprompt clear</code>",
+            parse_mode=ParseMode.HTML
+        )
+        return
+
+    # Get full prompt text from args
+    prompt_text = " ".join(context.args)
+
+    if prompt_text.lower() == "clear":
+        # Clear system prompt
+        db.set_setting('system_prompt', '')
+        await update.message.reply_text("✅ Системный промпт удален.")
+    else:
+        # Set new system prompt
+        db.set_setting('system_prompt', prompt_text)
+        await update.message.reply_text(
+            f"✅ Системный промпт установлен:\n\n<code>{prompt_text}</code>",
+            parse_mode=ParseMode.HTML
+        )
+
+
+async def show_prompt_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show current system prompt."""
+    user_id = update.effective_user.id
+
+    if not db.is_admin(user_id):
+        await update.message.reply_text("❌ У вас нет прав администратора.")
+        return
+
+    current_prompt = db.get_setting('system_prompt')
+
+    if current_prompt:
+        await update.message.reply_text(
+            f"📋 <b>Текущий системный промпт:</b>\n\n<code>{current_prompt}</code>",
+            parse_mode=ParseMode.HTML
+        )
+    else:
+        await update.message.reply_text("ℹ️ Системный промпт не установлен.")
+
+
 def register_admin_handlers(application: Application):
     """Register all admin command handlers."""
     application.add_handler(CommandHandler("admin", admin_panel))
@@ -247,4 +302,6 @@ def register_admin_handlers(application: Application):
     application.add_handler(CommandHandler("deauthorize", deauthorize_user_command))
     application.add_handler(CommandHandler("users", list_users_command))
     application.add_handler(CommandHandler("totalstats", total_stats_command))
+    application.add_handler(CommandHandler("setprompt", set_prompt_command))
+    application.add_handler(CommandHandler("showprompt", show_prompt_command))
     application.add_handler(CallbackQueryHandler(admin_callback, pattern="^admin_"))

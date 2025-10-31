@@ -10,6 +10,8 @@ This is a Telegram bot with Claude AI integration that supports:
 - Text file processing
 - User authorization system with admin controls
 - Token usage tracking and cost calculation
+- Group chat support (responds only when mentioned via @ or reply)
+- Customizable system prompt (admin can set behavior for all conversations)
 
 **Tech Stack**: Python 3.8+, python-telegram-bot 21.5, Anthropic API, SQLite
 
@@ -93,6 +95,7 @@ pct exec 200 -- journalctl -u telegram-bot -f
 - Routes messages to appropriate handlers
 - Manages user authorization checks
 - Implements text, photo, and document handlers
+- `is_bot_mentioned()` - Checks if bot is mentioned in group chats (@mention or reply)
 - Entry point: `main()` function
 
 **claude_client.py** - Claude API wrapper
@@ -104,13 +107,16 @@ pct exec 200 -- journalctl -u telegram-bot -f
 **database.py** - SQLite ORM layer
 - Three tables: users, usage_stats, conversations
 - `is_authorized()`, `is_admin()` - Access control
-- `add_message_to_history()`, `get_conversation_history()` - Context management
+- `add_message_to_history(user_id, chat_id, role, content)` - Save message to specific chat context
+- `get_conversation_history(user_id, chat_id, limit)` - Load last 10 minutes of chat-specific context
+- `clear_conversation_history(user_id, chat_id)` - Clear context for specific chat
 - `log_usage()` - Automatic cost calculation using CLAUDE_PRICING config
 
 **admin.py** - Admin commands module
 - `/admin` - Interactive panel with InlineKeyboard
 - `/authorize <user_id>`, `/deauthorize <user_id>` - User management
 - `/users`, `/totalstats` - Reporting
+- `/setprompt <text>`, `/showprompt` - System prompt management
 - Uses callback queries for button interactions
 
 **config.py** - Configuration loader
@@ -121,12 +127,31 @@ pct exec 200 -- journalctl -u telegram-bot -f
 ### Data Flow
 
 1. **User sends message** → Telegram API → `handle_message()` in bot.py
-2. **Authorization check** → database.py `is_authorized()`
-3. **Load conversation history** → database.py `get_conversation_history(limit=10)`
-4. **Send to Claude** → claude_client.py `send_message()`
-5. **Save response** → database.py `add_message_to_history()` x2 (user + assistant)
-6. **Log usage** → database.py `log_usage()` → calculates cost from config.CLAUDE_PRICING
-7. **Reply to user** → Telegram API
+2. **Group chat check** → `is_bot_mentioned()` → Skip if in group and not mentioned
+3. **Authorization check** → database.py `is_authorized()`
+4. **Get chat_id** → `update.effective_chat.id` (isolates context per chat)
+5. **Load conversation history** → database.py `get_conversation_history(user_id, chat_id, limit=10)`
+   - Only loads messages from last 10 minutes
+   - Only from this specific chat (private/group/channel)
+6. **Load system prompt** → database.py `get_setting('system_prompt')`
+7. **Send to Claude** → claude_client.py `send_message(history, system_prompt)`
+   - System prompt applied to this conversation
+8. **Save response** → database.py `add_message_to_history(user_id, chat_id, ...)` x2 (user + assistant)
+9. **Log usage** → database.py `log_usage()` → calculates cost from config.CLAUDE_PRICING
+10. **Reply to user** → Telegram API
+
+### Group Chat Behavior
+
+**Private chats**: Bot responds to all messages
+
+**Group chats**: Bot responds only when:
+- Message contains @bot_username mention
+- Message is a reply to bot's previous message
+
+To enable group functionality:
+1. Tell @BotFather: `/mybots` → Select bot → `Bot Settings` → `Group Privacy` → `Disable`
+2. Add bot to group as admin or member
+3. Mention bot: `@your_bot привет` or reply to bot's messages
 
 ### Image Handling Flow
 
@@ -143,8 +168,23 @@ users: user_id (PK), username, first_name, last_name, is_authorized, is_admin, c
 
 usage_stats: id (PK), user_id (FK), model, input_tokens, output_tokens, cost_usd, timestamp
 
-conversations: id (PK), user_id (FK), role, content, timestamp
+conversations: id (PK), user_id (FK), chat_id, role, content, timestamp
+
+settings: key (PK), value, updated_at
 ```
+
+**Context Isolation:**
+- `chat_id` isolates conversations per chat (private chats, groups, channels)
+- `get_conversation_history()` filters by `timestamp >= datetime('now', '-10 minutes')`
+- Each user has separate context in each chat
+- Context automatically expires after 10 minutes of inactivity
+
+**System Prompt:**
+- Stored in `settings` table with key='system_prompt'
+- Admin can set via `/setprompt <text>` command
+- Applied to all conversations (text, images, documents)
+- Loaded dynamically before each Claude API call
+- Can be cleared with `/setprompt clear`
 
 Admin user (ADMIN_USER_ID from .env) is automatically created with is_admin=1 on first run.
 

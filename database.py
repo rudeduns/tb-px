@@ -55,10 +55,26 @@ class Database:
             CREATE TABLE IF NOT EXISTS conversations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER,
+                chat_id INTEGER,
                 role TEXT,
                 content TEXT,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (user_id)
+            )
+        """)
+
+        # Migrate existing database - add chat_id column if it doesn't exist
+        cursor.execute("PRAGMA table_info(conversations)")
+        columns = [column[1] for column in cursor.fetchall()]
+        if 'chat_id' not in columns:
+            cursor.execute("ALTER TABLE conversations ADD COLUMN chat_id INTEGER")
+
+        # Settings table for system prompt and other settings
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
@@ -210,28 +226,29 @@ class Database:
             "total_requests": row[3] or 0
         }
 
-    def add_message_to_history(self, user_id: int, role: str, content: str):
-        """Add message to conversation history."""
+    def add_message_to_history(self, user_id: int, chat_id: int, role: str, content: str):
+        """Add message to conversation history for a specific chat."""
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO conversations (user_id, role, content)
-            VALUES (?, ?, ?)
-        """, (user_id, role, content))
+            INSERT INTO conversations (user_id, chat_id, role, content)
+            VALUES (?, ?, ?, ?)
+        """, (user_id, chat_id, role, content))
         conn.commit()
         conn.close()
 
-    def get_conversation_history(self, user_id: int, limit: int = 20) -> List[Dict]:
-        """Get recent conversation history for a user."""
+    def get_conversation_history(self, user_id: int, chat_id: int, limit: int = 20) -> List[Dict]:
+        """Get recent conversation history for a user in a specific chat (last 10 minutes)."""
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT role, content, timestamp
             FROM conversations
-            WHERE user_id = ?
+            WHERE user_id = ? AND chat_id = ?
+                AND timestamp >= datetime('now', '-10 minutes')
             ORDER BY timestamp DESC
             LIMIT ?
-        """, (user_id, limit))
+        """, (user_id, chat_id, limit))
 
         messages = []
         for row in reversed(cursor.fetchall()):  # Reverse to get chronological order
@@ -242,10 +259,36 @@ class Database:
         conn.close()
         return messages
 
-    def clear_conversation_history(self, user_id: int):
-        """Clear conversation history for a user."""
+    def clear_conversation_history(self, user_id: int, chat_id: int = None):
+        """Clear conversation history for a user in specific chat or all chats."""
         conn = self.get_connection()
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM conversations WHERE user_id = ?", (user_id,))
+        if chat_id is not None:
+            cursor.execute("DELETE FROM conversations WHERE user_id = ? AND chat_id = ?", (user_id, chat_id))
+        else:
+            cursor.execute("DELETE FROM conversations WHERE user_id = ?", (user_id,))
+        conn.commit()
+        conn.close()
+
+    def get_setting(self, key: str, default: str = None) -> Optional[str]:
+        """Get a setting value by key."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
+        row = cursor.fetchone()
+        conn.close()
+        return row[0] if row else default
+
+    def set_setting(self, key: str, value: str):
+        """Set a setting value."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO settings (key, value, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = CURRENT_TIMESTAMP
+        """, (key, value))
         conn.commit()
         conn.close()

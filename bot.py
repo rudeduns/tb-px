@@ -30,6 +30,47 @@ claude = ClaudeClient()
 MAX_MESSAGE_LENGTH = 4096
 
 
+def is_bot_mentioned(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Check if bot is mentioned in a group message (via @ or reply)."""
+    # Always respond in private chats
+    if update.effective_chat.type == 'private':
+        return True
+
+    message = update.message
+    if not message:
+        return False
+
+    # Check if message is a reply to bot's message
+    if message.reply_to_message and message.reply_to_message.from_user.id == context.bot.id:
+        return True
+
+    # Check if bot is mentioned in message text
+    if message.entities and message.text:
+        for entity in message.entities:
+            if entity.type in ('mention', 'text_mention'):
+                if entity.type == 'mention':
+                    mention_text = message.text[entity.offset:entity.offset + entity.length]
+                    bot_username = context.bot.username
+                    if mention_text == f'@{bot_username}' or mention_text.lower() == f'@{bot_username.lower()}':
+                        return True
+                elif entity.type == 'text_mention' and entity.user.id == context.bot.id:
+                    return True
+
+    # Check if bot is mentioned in caption (for photos)
+    if message.caption and message.caption_entities:
+        for entity in message.caption_entities:
+            if entity.type in ('mention', 'text_mention'):
+                if entity.type == 'mention':
+                    mention_text = message.caption[entity.offset:entity.offset + entity.length]
+                    bot_username = context.bot.username
+                    if mention_text == f'@{bot_username}' or mention_text.lower() == f'@{bot_username.lower()}':
+                        return True
+                elif entity.type == 'text_mention' and entity.user.id == context.bot.id:
+                    return True
+
+    return False
+
+
 def split_message(text: str, max_length: int = MAX_MESSAGE_LENGTH) -> list[str]:
     """Split long message into chunks that fit Telegram's limit."""
     if len(text) <= max_length:
@@ -128,7 +169,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/authorize &lt;user_id&gt; - Добавить пользователя\n"
             "/deauthorize &lt;user_id&gt; - Удалить пользователя\n"
             "/users - Список всех пользователей\n"
-            "/totalstats - Общая статистика"
+            "/totalstats - Общая статистика\n"
+            "/setprompt &lt;текст&gt; - Установить системный промпт\n"
+            "/showprompt - Показать текущий промпт"
         )
 
     await update.message.reply_text(help_text, parse_mode=ParseMode.HTML)
@@ -137,13 +180,14 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def clear_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /clear command to clear conversation history."""
     user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
 
     if not db.is_authorized(user_id):
         await update.message.reply_text("❌ У вас нет доступа к боту.")
         return
 
-    db.clear_conversation_history(user_id)
-    await update.message.reply_text("🗑️ История разговора очищена.")
+    db.clear_conversation_history(user_id, chat_id)
+    await update.message.reply_text("🗑️ История разговора очищена в этом чате.")
 
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -171,6 +215,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle text messages."""
     user_id = update.effective_user.id
 
+    # In groups, only respond if bot is mentioned
+    if not is_bot_mentioned(update, context):
+        return
+
     if not db.is_authorized(user_id):
         await update.message.reply_text(
             "❌ У вас нет доступа к боту.\n"
@@ -188,19 +236,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.chat.send_action(ChatAction.TYPING)
 
     try:
-        # Get conversation history
-        history = db.get_conversation_history(user_id, limit=10)
+        chat_id = update.effective_chat.id
+
+        # Get conversation history for this specific chat
+        history = db.get_conversation_history(user_id, chat_id, limit=10)
 
         # Add current message
         user_message = update.message.text
         history.append({"role": "user", "content": user_message})
 
-        # Send to Claude
-        response_text, input_tokens, output_tokens = claude.send_message(history)
+        # Get system prompt from database
+        system_prompt = db.get_setting('system_prompt')
 
-        # Save to database
-        db.add_message_to_history(user_id, "user", user_message)
-        db.add_message_to_history(user_id, "assistant", response_text)
+        # Send to Claude with system prompt
+        response_text, input_tokens, output_tokens = claude.send_message(history, system_prompt)
+
+        # Save to database with chat_id
+        db.add_message_to_history(user_id, chat_id, "user", user_message)
+        db.add_message_to_history(user_id, chat_id, "assistant", response_text)
 
         # Log usage
         cost = db.log_usage(user_id, config.CLAUDE_MODEL, input_tokens, output_tokens)
@@ -235,6 +288,10 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle photo messages."""
     user_id = update.effective_user.id
 
+    # In groups, only respond if bot is mentioned
+    if not is_bot_mentioned(update, context):
+        return
+
     if not db.is_authorized(user_id):
         await update.message.reply_text("❌ У вас нет доступа к боту.")
         return
@@ -253,21 +310,26 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Download photo
         photo_bytes = await photo_file.download_as_bytearray()
 
+        chat_id = update.effective_chat.id
+
         # Get caption or default question
         caption = update.message.caption or "Что изображено на этой картинке?"
 
-        # Get conversation history
-        history = db.get_conversation_history(user_id, limit=10)
+        # Get conversation history for this specific chat
+        history = db.get_conversation_history(user_id, chat_id, limit=10)
         history.append({"role": "user", "content": caption})
 
-        # Send to Claude with image
+        # Get system prompt from database
+        system_prompt = db.get_setting('system_prompt')
+
+        # Send to Claude with image and system prompt
         response_text, input_tokens, output_tokens = claude.send_message_with_image(
-            history, bytes(photo_bytes), "jpeg"
+            history, bytes(photo_bytes), "jpeg", system_prompt
         )
 
-        # Save to database
-        db.add_message_to_history(user_id, "user", f"[Image] {caption}")
-        db.add_message_to_history(user_id, "assistant", response_text)
+        # Save to database with chat_id
+        db.add_message_to_history(user_id, chat_id, "user", f"[Image] {caption}")
+        db.add_message_to_history(user_id, chat_id, "assistant", response_text)
 
         # Log usage
         cost = db.log_usage(user_id, config.CLAUDE_MODEL, input_tokens, output_tokens)
@@ -336,21 +398,26 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except UnicodeDecodeError:
             doc_text = bytes(doc_bytes).decode('latin-1')
 
+        chat_id = update.effective_chat.id
+
         # Get caption or default question
         caption = update.message.caption or "Проанализируй этот документ"
 
-        # Get conversation history
-        history = db.get_conversation_history(user_id, limit=5)
+        # Get conversation history for this specific chat
+        history = db.get_conversation_history(user_id, chat_id, limit=5)
         history.append({"role": "user", "content": caption})
 
-        # Send to Claude with document
+        # Get system prompt from database
+        system_prompt = db.get_setting('system_prompt')
+
+        # Send to Claude with document and system prompt
         response_text, input_tokens, output_tokens = claude.send_message_with_document(
-            history, doc_text
+            history, doc_text, system_prompt
         )
 
-        # Save to database
-        db.add_message_to_history(user_id, "user", f"[Document: {document.file_name}] {caption}")
-        db.add_message_to_history(user_id, "assistant", response_text)
+        # Save to database with chat_id
+        db.add_message_to_history(user_id, chat_id, "user", f"[Document: {document.file_name}] {caption}")
+        db.add_message_to_history(user_id, chat_id, "assistant", response_text)
 
         # Log usage
         cost = db.log_usage(user_id, config.CLAUDE_MODEL, input_tokens, output_tokens)
