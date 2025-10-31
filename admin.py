@@ -30,9 +30,9 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        "⚙️ *Панель администратора*\n\nВыберите действие:",
+        "⚙️ <b>Панель администратора</b>\n\nВыберите действие:",
         reply_markup=reply_markup,
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=ParseMode.HTML
     )
 
 
@@ -50,61 +50,61 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == "admin_users":
         users = db.get_all_users()
 
-        users_text = "👥 *Список пользователей*\n\n"
+        users_text = "👥 <b>Список пользователей</b>\n\n"
 
         authorized_users = [u for u in users if u['is_authorized']]
         unauthorized_users = [u for u in users if not u['is_authorized']]
 
         if authorized_users:
-            users_text += "*Авторизованные:*\n"
+            users_text += "<b>Авторизованные:</b>\n"
             for user in authorized_users:
                 name = user['first_name'] or "Unknown"
                 username = f"@{user['username']}" if user['username'] else ""
                 admin_badge = " 👑" if user['is_admin'] else ""
-                users_text += f"• {name} {username}{admin_badge}\n  ID: `{user['user_id']}`\n"
+                users_text += f"• {name} {username}{admin_badge}\n  ID: <code>{user['user_id']}</code>\n"
             users_text += "\n"
 
         if unauthorized_users:
-            users_text += "*Ожидают авторизации:*\n"
+            users_text += "<b>Ожидают авторизации:</b>\n"
             for user in unauthorized_users:
                 name = user['first_name'] or "Unknown"
                 username = f"@{user['username']}" if user['username'] else ""
-                users_text += f"• {name} {username}\n  ID: `{user['user_id']}`\n"
+                users_text += f"• {name} {username}\n  ID: <code>{user['user_id']}</code>\n"
 
-        users_text += f"\n*Всего пользователей:* {len(users)}"
+        users_text += f"\n<b>Всего пользователей:</b> {len(users)}"
 
-        await query.edit_message_text(users_text, parse_mode=ParseMode.MARKDOWN)
+        await query.edit_message_text(users_text, parse_mode=ParseMode.HTML)
 
     elif query.data == "admin_stats":
         stats = db.get_total_usage()
 
         stats_text = (
-            "📊 *Общая статистика использования*\n\n"
+            "📊 <b>Общая статистика использования</b>\n\n"
             f"Всего запросов: {stats['total_requests']:,}\n"
             f"Токенов ввода: {stats['total_input_tokens']:,}\n"
             f"Токенов вывода: {stats['total_output_tokens']:,}\n"
             f"Всего токенов: {stats['total_input_tokens'] + stats['total_output_tokens']:,}\n\n"
-            f"💰 *Общая стоимость:* ${stats['total_cost']:.4f}\n\n"
-            f"Используемая модель: `{config.CLAUDE_MODEL}`"
+            f"💰 <b>Общая стоимость:</b> ${stats['total_cost']:.4f}\n\n"
+            f"Используемая модель: <code>{config.CLAUDE_MODEL}</code>"
         )
 
-        await query.edit_message_text(stats_text, parse_mode=ParseMode.MARKDOWN)
+        await query.edit_message_text(stats_text, parse_mode=ParseMode.HTML)
 
     elif query.data == "admin_pricing":
-        pricing_text = "💰 *Стоимость токенов Claude*\n\n"
+        pricing_text = "💰 <b>Стоимость токенов Claude</b>\n\n"
 
         for model, prices in config.CLAUDE_PRICING.items():
-            pricing_text += f"*{model}*\n"
+            pricing_text += f"<b>{model}</b>\n"
             pricing_text += f"  Ввод: ${prices['input']:.2f} / 1M токенов\n"
             pricing_text += f"  Вывод: ${prices['output']:.2f} / 1M токенов\n\n"
 
         current = config.CLAUDE_PRICING.get(config.CLAUDE_MODEL)
         if current:
-            pricing_text += f"*Текущая модель:* `{config.CLAUDE_MODEL}`\n"
+            pricing_text += f"<b>Текущая модель:</b> <code>{config.CLAUDE_MODEL}</code>\n"
             pricing_text += f"Ввод: ${current['input']:.2f} / 1M\n"
             pricing_text += f"Вывод: ${current['output']:.2f} / 1M"
 
-        await query.edit_message_text(pricing_text, parse_mode=ParseMode.MARKDOWN)
+        await query.edit_message_text(pricing_text, parse_mode=ParseMode.HTML)
 
 
 async def authorize_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -117,9 +117,9 @@ async def authorize_user_command(update: Update, context: ContextTypes.DEFAULT_T
 
     if not context.args or len(context.args) != 1:
         await update.message.reply_text(
-            "❌ Использование: `/authorize <user_id>`\n"
-            "Пример: `/authorize 123456789`",
-            parse_mode=ParseMode.MARKDOWN
+            "❌ Использование: <code>/authorize &lt;user_id&gt;</code>\n"
+            "Пример: <code>/authorize 123456789</code>",
+            parse_mode=ParseMode.HTML
         )
         return
 
@@ -135,16 +135,16 @@ async def authorize_user_command(update: Update, context: ContextTypes.DEFAULT_T
 
     if not user_exists:
         await update.message.reply_text(
-            f"⚠️ Пользователь с ID `{target_user_id}` не найден в базе.\n"
+            f"⚠️ Пользователь с ID <code>{target_user_id}</code> не найден в базе.\n"
             "Пользователь должен сначала написать боту команду /start",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=ParseMode.HTML
         )
         return
 
     db.authorize_user(target_user_id)
     await update.message.reply_text(
-        f"✅ Пользователь `{target_user_id}` авторизован.",
-        parse_mode=ParseMode.MARKDOWN
+        f"✅ Пользователь <code>{target_user_id}</code> авторизован.",
+        parse_mode=ParseMode.HTML
     )
 
 
@@ -158,9 +158,9 @@ async def deauthorize_user_command(update: Update, context: ContextTypes.DEFAULT
 
     if not context.args or len(context.args) != 1:
         await update.message.reply_text(
-            "❌ Использование: `/deauthorize <user_id>`\n"
-            "Пример: `/deauthorize 123456789`",
-            parse_mode=ParseMode.MARKDOWN
+            "❌ Использование: <code>/deauthorize &lt;user_id&gt;</code>\n"
+            "Пример: <code>/deauthorize 123456789</code>",
+            parse_mode=ParseMode.HTML
         )
         return
 
@@ -176,8 +176,8 @@ async def deauthorize_user_command(update: Update, context: ContextTypes.DEFAULT
 
     db.deauthorize_user(target_user_id)
     await update.message.reply_text(
-        f"✅ Пользователь `{target_user_id}` деавторизован.",
-        parse_mode=ParseMode.MARKDOWN
+        f"✅ Пользователь <code>{target_user_id}</code> деавторизован.",
+        parse_mode=ParseMode.HTML
     )
 
 
@@ -191,30 +191,30 @@ async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     users = db.get_all_users()
 
-    users_text = "👥 *Список всех пользователей*\n\n"
+    users_text = "👥 <b>Список всех пользователей</b>\n\n"
 
     authorized_users = [u for u in users if u['is_authorized']]
     unauthorized_users = [u for u in users if not u['is_authorized']]
 
     if authorized_users:
-        users_text += "*Авторизованные:*\n"
+        users_text += "<b>Авторизованные:</b>\n"
         for user in authorized_users:
             name = user['first_name'] or "Unknown"
             username = f"@{user['username']}" if user['username'] else ""
             admin_badge = " 👑" if user['is_admin'] else ""
-            users_text += f"• {name} {username}{admin_badge}\n  ID: `{user['user_id']}`\n"
+            users_text += f"• {name} {username}{admin_badge}\n  ID: <code>{user['user_id']}</code>\n"
         users_text += "\n"
 
     if unauthorized_users:
-        users_text += "*Ожидают авторизации:*\n"
+        users_text += "<b>Ожидают авторизации:</b>\n"
         for user in unauthorized_users:
             name = user['first_name'] or "Unknown"
             username = f"@{user['username']}" if user['username'] else ""
-            users_text += f"• {name} {username}\n  ID: `{user['user_id']}`\n"
+            users_text += f"• {name} {username}\n  ID: <code>{user['user_id']}</code>\n"
 
-    users_text += f"\n*Всего пользователей:* {len(users)}"
+    users_text += f"\n<b>Всего пользователей:</b> {len(users)}"
 
-    await update.message.reply_text(users_text, parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text(users_text, parse_mode=ParseMode.HTML)
 
 
 async def total_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -228,16 +228,16 @@ async def total_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     stats = db.get_total_usage()
 
     stats_text = (
-        "📊 *Общая статистика использования*\n\n"
+        "📊 <b>Общая статистика использования</b>\n\n"
         f"Всего запросов: {stats['total_requests']:,}\n"
         f"Токенов ввода: {stats['total_input_tokens']:,}\n"
         f"Токенов вывода: {stats['total_output_tokens']:,}\n"
         f"Всего токенов: {stats['total_input_tokens'] + stats['total_output_tokens']:,}\n\n"
-        f"💰 *Общая стоимость:* ${stats['total_cost']:.4f}\n\n"
-        f"Используемая модель: `{config.CLAUDE_MODEL}`"
+        f"💰 <b>Общая стоимость:</b> ${stats['total_cost']:.4f}\n\n"
+        f"Используемая модель: <code>{config.CLAUDE_MODEL}</code>"
     )
 
-    await update.message.reply_text(stats_text, parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text(stats_text, parse_mode=ParseMode.HTML)
 
 
 def register_admin_handlers(application: Application):

@@ -77,9 +77,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"👋 Привет, {user.first_name}!\n\n"
             "❌ У вас пока нет доступа к боту.\n"
-            f"Ваш ID: `{user.id}`\n\n"
+            f"Ваш ID: <code>{user.id}</code>\n\n"
             "Отправьте этот ID администратору для получения доступа.",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=ParseMode.HTML
         )
         return
 
@@ -93,7 +93,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/clear - Очистить историю разговора\n"
         "/help - Показать справку\n"
         "/stats - Показать вашу статистику использования",
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=ParseMode.HTML
     )
 
 
@@ -106,32 +106,32 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     help_text = (
-        "🤖 *Справка по боту*\n\n"
-        "*Основные команды:*\n"
+        "🤖 <b>Справка по боту</b>\n\n"
+        "<b>Основные команды:</b>\n"
         "/start - Начать работу с ботом\n"
         "/help - Показать эту справку\n"
         "/clear - Очистить историю разговора\n"
         "/stats - Показать статистику использования\n\n"
-        "*Возможности:*\n"
+        "<b>Возможности:</b>\n"
         "• Отправьте текстовое сообщение - получите ответ от Claude\n"
         "• Отправьте картинку с подписью - Claude проанализирует её\n"
         "• Отправьте текстовый файл - Claude прочитает и ответит\n\n"
-        "*Особенности:*\n"
+        "<b>Особенности:</b>\n"
         "• Бот помнит контекст разговора\n"
         "• Используется модель: " + config.CLAUDE_MODEL
     )
 
     if db.is_admin(user_id):
         help_text += (
-            "\n\n*Команды администратора:*\n"
+            "\n\n<b>Команды администратора:</b>\n"
             "/admin - Панель администратора\n"
-            "/authorize <user_id> - Добавить пользователя\n"
-            "/deauthorize <user_id> - Удалить пользователя\n"
+            "/authorize &lt;user_id&gt; - Добавить пользователя\n"
+            "/deauthorize &lt;user_id&gt; - Удалить пользователя\n"
             "/users - Список всех пользователей\n"
             "/totalstats - Общая статистика"
         )
 
-    await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text(help_text, parse_mode=ParseMode.HTML)
 
 
 async def clear_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -157,14 +157,14 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     usage = db.get_user_usage(user_id)
 
     stats_text = (
-        "📊 *Ваша статистика*\n\n"
+        "📊 <b>Ваша статистика</b>\n\n"
         f"Запросов: {usage['total_requests']}\n"
         f"Токенов ввода: {usage['total_input_tokens']:,}\n"
         f"Токенов вывода: {usage['total_output_tokens']:,}\n"
         f"Общая стоимость: ${usage['total_cost']:.4f}"
     )
 
-    await update.message.reply_text(stats_text, parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text(stats_text, parse_mode=ParseMode.HTML)
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -174,9 +174,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not db.is_authorized(user_id):
         await update.message.reply_text(
             "❌ У вас нет доступа к боту.\n"
-            f"Ваш ID: `{user_id}`\n"
+            f"Ваш ID: <code>{user_id}</code>\n"
             "Отправьте этот ID администратору.",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=ParseMode.HTML
         )
         return
 
@@ -210,9 +210,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for i, chunk in enumerate(message_chunks):
             try:
-                await update.message.reply_text(chunk, parse_mode=ParseMode.MARKDOWN)
+                await update.message.reply_text(chunk, parse_mode=ParseMode.HTML)
             except Exception as parse_error:
-                # Markdown parsing or length error, send as plain text
+                # HTML parsing or length error, send as plain text
                 logger.warning(f"Message send error for user {user_id}: {parse_error}")
                 try:
                     await update.message.reply_text(chunk)
@@ -277,9 +277,9 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for i, chunk in enumerate(message_chunks):
             try:
-                await update.message.reply_text(chunk, parse_mode=ParseMode.MARKDOWN)
+                await update.message.reply_text(chunk, parse_mode=ParseMode.HTML)
             except Exception as parse_error:
-                # Markdown parsing or length error, send as plain text
+                # HTML parsing or length error, send as plain text
                 logger.warning(f"Message send error for user {user_id} (image): {parse_error}")
                 try:
                     await update.message.reply_text(chunk)
@@ -360,9 +360,9 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for i, chunk in enumerate(message_chunks):
             try:
-                await update.message.reply_text(chunk, parse_mode=ParseMode.MARKDOWN)
+                await update.message.reply_text(chunk, parse_mode=ParseMode.HTML)
             except Exception as parse_error:
-                # Markdown parsing or length error, send as plain text
+                # HTML parsing or length error, send as plain text
                 logger.warning(f"Message send error for user {user_id} (document): {parse_error}")
                 try:
                     await update.message.reply_text(chunk)
