@@ -26,6 +26,47 @@ logger = logging.getLogger(__name__)
 db = Database()
 claude = ClaudeClient()
 
+# Telegram message length limit
+MAX_MESSAGE_LENGTH = 4096
+
+
+def split_message(text: str, max_length: int = MAX_MESSAGE_LENGTH) -> list[str]:
+    """Split long message into chunks that fit Telegram's limit."""
+    if len(text) <= max_length:
+        return [text]
+
+    chunks = []
+    current_chunk = ""
+
+    # Split by paragraphs first
+    paragraphs = text.split('\n\n')
+
+    for paragraph in paragraphs:
+        # If single paragraph is too long, split by sentences
+        if len(paragraph) > max_length:
+            sentences = paragraph.split('. ')
+            for sentence in sentences:
+                if len(current_chunk) + len(sentence) + 2 < max_length:
+                    current_chunk += sentence + '. '
+                else:
+                    if current_chunk:
+                        chunks.append(current_chunk.strip())
+                    current_chunk = sentence + '. '
+        else:
+            # Try to add paragraph to current chunk
+            if len(current_chunk) + len(paragraph) + 2 < max_length:
+                current_chunk += paragraph + '\n\n'
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                current_chunk = paragraph + '\n\n'
+
+    # Add remaining text
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+
+    return chunks if chunks else [text[:max_length]]
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command."""
@@ -164,13 +205,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Log usage
         cost = db.log_usage(user_id, config.CLAUDE_MODEL, input_tokens, output_tokens)
 
-        # Send response - try with Markdown, fallback to plain text if parsing fails
-        try:
-            await update.message.reply_text(response_text, parse_mode=ParseMode.MARKDOWN)
-        except Exception as parse_error:
-            # Markdown parsing failed, send as plain text
-            logger.warning(f"Markdown parse error for user {user_id}: {parse_error}")
-            await update.message.reply_text(response_text)
+        # Send response - split if too long, try with Markdown, fallback to plain text
+        message_chunks = split_message(response_text)
+
+        for i, chunk in enumerate(message_chunks):
+            try:
+                await update.message.reply_text(chunk, parse_mode=ParseMode.MARKDOWN)
+            except Exception as parse_error:
+                # Markdown parsing or length error, send as plain text
+                logger.warning(f"Message send error for user {user_id}: {parse_error}")
+                try:
+                    await update.message.reply_text(chunk)
+                except Exception as e:
+                    # If still fails, truncate
+                    logger.error(f"Failed to send chunk {i+1}: {e}")
+                    await update.message.reply_text(chunk[:MAX_MESSAGE_LENGTH])
 
         # Log for admin
         logger.info(f"User {user_id} - Tokens: {input_tokens}+{output_tokens}, Cost: ${cost:.4f}")
@@ -223,13 +272,20 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Log usage
         cost = db.log_usage(user_id, config.CLAUDE_MODEL, input_tokens, output_tokens)
 
-        # Send response - try with Markdown, fallback to plain text if parsing fails
-        try:
-            await update.message.reply_text(response_text, parse_mode=ParseMode.MARKDOWN)
-        except Exception as parse_error:
-            # Markdown parsing failed, send as plain text
-            logger.warning(f"Markdown parse error for user {user_id} (image): {parse_error}")
-            await update.message.reply_text(response_text)
+        # Send response - split if too long, try with Markdown, fallback to plain text
+        message_chunks = split_message(response_text)
+
+        for i, chunk in enumerate(message_chunks):
+            try:
+                await update.message.reply_text(chunk, parse_mode=ParseMode.MARKDOWN)
+            except Exception as parse_error:
+                # Markdown parsing or length error, send as plain text
+                logger.warning(f"Message send error for user {user_id} (image): {parse_error}")
+                try:
+                    await update.message.reply_text(chunk)
+                except Exception as e:
+                    logger.error(f"Failed to send chunk {i+1}: {e}")
+                    await update.message.reply_text(chunk[:MAX_MESSAGE_LENGTH])
 
         logger.info(f"User {user_id} - Image - Tokens: {input_tokens}+{output_tokens}, Cost: ${cost:.4f}")
 
@@ -299,13 +355,20 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Log usage
         cost = db.log_usage(user_id, config.CLAUDE_MODEL, input_tokens, output_tokens)
 
-        # Send response - try with Markdown, fallback to plain text if parsing fails
-        try:
-            await update.message.reply_text(response_text, parse_mode=ParseMode.MARKDOWN)
-        except Exception as parse_error:
-            # Markdown parsing failed, send as plain text
-            logger.warning(f"Markdown parse error for user {user_id} (document): {parse_error}")
-            await update.message.reply_text(response_text)
+        # Send response - split if too long, try with Markdown, fallback to plain text
+        message_chunks = split_message(response_text)
+
+        for i, chunk in enumerate(message_chunks):
+            try:
+                await update.message.reply_text(chunk, parse_mode=ParseMode.MARKDOWN)
+            except Exception as parse_error:
+                # Markdown parsing or length error, send as plain text
+                logger.warning(f"Message send error for user {user_id} (document): {parse_error}")
+                try:
+                    await update.message.reply_text(chunk)
+                except Exception as e:
+                    logger.error(f"Failed to send chunk {i+1}: {e}")
+                    await update.message.reply_text(chunk[:MAX_MESSAGE_LENGTH])
 
         logger.info(f"User {user_id} - Document - Tokens: {input_tokens}+{output_tokens}, Cost: ${cost:.4f}")
 
