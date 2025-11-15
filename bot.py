@@ -300,6 +300,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message_chunks = split_message(response_text)
 
         for i, chunk in enumerate(message_chunks):
+            # Small delay between chunks to look more natural
+            if i > 0:
+                await asyncio.sleep(0.5)
+
             try:
                 await update.message.reply_text(chunk, parse_mode=ParseMode.HTML)
             except Exception as parse_error:
@@ -312,22 +316,25 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     logger.error(f"Failed to send chunk {i+1}: {e}")
                     await update.message.reply_text(chunk[:MAX_MESSAGE_LENGTH])
 
-        # Log for admin
-        logger.info(f"User {user_id} - Tokens: {input_tokens}+{output_tokens}, Cost: ${cost:.4f}")
-
-    except Exception as e:
-        logger.error(f"Error handling message: {e}")
-        await update.message.reply_text(
-            f"❌ Произошла ошибка при обработке сообщения:\n{str(e)}"
-        )
-    finally:
-        # Stop typing indicator
+        # Stop typing indicator after all messages sent
         stop_typing.set()
         typing_task.cancel()
         try:
             await typing_task
         except asyncio.CancelledError:
             pass
+
+        # Log for admin
+        logger.info(f"User {user_id} - Tokens: {input_tokens}+{output_tokens}, Cost: ${cost:.4f}")
+
+    except Exception as e:
+        logger.error(f"Error handling message: {e}")
+        # Stop typing on error
+        stop_typing.set()
+        typing_task.cancel()
+        await update.message.reply_text(
+            f"❌ Произошла ошибка при обработке сообщения:\n{str(e)}"
+        )
 
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -392,6 +399,10 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message_chunks = split_message(response_text)
 
         for i, chunk in enumerate(message_chunks):
+            # Small delay between chunks to look more natural
+            if i > 0:
+                await asyncio.sleep(0.5)
+
             try:
                 await update.message.reply_text(chunk, parse_mode=ParseMode.HTML)
             except Exception as parse_error:
@@ -403,21 +414,24 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     logger.error(f"Failed to send chunk {i+1}: {e}")
                     await update.message.reply_text(chunk[:MAX_MESSAGE_LENGTH])
 
-        logger.info(f"User {user_id} - Image - Tokens: {input_tokens}+{output_tokens}, Cost: ${cost:.4f}")
-
-    except Exception as e:
-        logger.error(f"Error handling photo: {e}")
-        await update.message.reply_text(
-            f"❌ Произошла ошибка при обработке изображения:\n{str(e)}"
-        )
-    finally:
-        # Stop typing indicator
+        # Stop typing indicator after all messages sent
         stop_typing.set()
         typing_task.cancel()
         try:
             await typing_task
         except asyncio.CancelledError:
             pass
+
+        logger.info(f"User {user_id} - Image - Tokens: {input_tokens}+{output_tokens}, Cost: ${cost:.4f}")
+
+    except Exception as e:
+        logger.error(f"Error handling photo: {e}")
+        # Stop typing on error
+        stop_typing.set()
+        typing_task.cancel()
+        await update.message.reply_text(
+            f"❌ Произошла ошибка при обработке изображения:\n{str(e)}"
+        )
 
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -496,6 +510,10 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message_chunks = split_message(response_text)
 
         for i, chunk in enumerate(message_chunks):
+            # Small delay between chunks to look more natural
+            if i > 0:
+                await asyncio.sleep(0.5)
+
             try:
                 await update.message.reply_text(chunk, parse_mode=ParseMode.HTML)
             except Exception as parse_error:
@@ -507,21 +525,24 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     logger.error(f"Failed to send chunk {i+1}: {e}")
                     await update.message.reply_text(chunk[:MAX_MESSAGE_LENGTH])
 
-        logger.info(f"User {user_id} - Document - Tokens: {input_tokens}+{output_tokens}, Cost: ${cost:.4f}")
-
-    except Exception as e:
-        logger.error(f"Error handling document: {e}")
-        await update.message.reply_text(
-            f"❌ Произошла ошибка при обработке документа:\n{str(e)}"
-        )
-    finally:
-        # Stop typing indicator
+        # Stop typing indicator after all messages sent
         stop_typing.set()
         typing_task.cancel()
         try:
             await typing_task
         except asyncio.CancelledError:
             pass
+
+        logger.info(f"User {user_id} - Document - Tokens: {input_tokens}+{output_tokens}, Cost: ${cost:.4f}")
+
+    except Exception as e:
+        logger.error(f"Error handling document: {e}")
+        # Stop typing on error
+        stop_typing.set()
+        typing_task.cancel()
+        await update.message.reply_text(
+            f"❌ Произошла ошибка при обработке документа:\n{str(e)}"
+        )
 
 
 def main():
