@@ -25,6 +25,8 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("👥 Список пользователей", callback_data="admin_users")],
         [InlineKeyboardButton("📊 Общая статистика", callback_data="admin_stats")],
         [InlineKeyboardButton("💰 Стоимость токенов", callback_data="admin_pricing")],
+        [InlineKeyboardButton("🔧 Управление пользователями", callback_data="admin_manage_users")],
+        [InlineKeyboardButton("💬 Системный промпт", callback_data="admin_prompt_menu")],
     ]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -73,7 +75,10 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         users_text += f"\n<b>Всего пользователей:</b> {len(users)}"
 
-        await query.edit_message_text(users_text, parse_mode=ParseMode.HTML)
+        keyboard = [[InlineKeyboardButton("◀️ Назад", callback_data="admin_back")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(users_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
     elif query.data == "admin_stats":
         stats = db.get_total_usage()
@@ -88,7 +93,10 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Используемая модель: <code>{config.CLAUDE_MODEL}</code>"
         )
 
-        await query.edit_message_text(stats_text, parse_mode=ParseMode.HTML)
+        keyboard = [[InlineKeyboardButton("◀️ Назад", callback_data="admin_back")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(stats_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
     elif query.data == "admin_pricing":
         pricing_text = "💰 <b>Стоимость токенов Claude</b>\n\n"
@@ -104,7 +112,126 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pricing_text += f"Ввод: ${current['input']:.2f} / 1M\n"
             pricing_text += f"Вывод: ${current['output']:.2f} / 1M"
 
-        await query.edit_message_text(pricing_text, parse_mode=ParseMode.HTML)
+        keyboard = [[InlineKeyboardButton("◀️ Назад", callback_data="admin_back")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(pricing_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
+    elif query.data == "admin_manage_users":
+        users = db.get_all_users()
+        unauthorized_users = [u for u in users if not u['is_authorized']]
+        authorized_users = [u for u in users if u['is_authorized'] and not u['is_admin']]
+
+        manage_text = "🔧 <b>Управление пользователями</b>\n\n"
+
+        keyboard = []
+
+        if unauthorized_users:
+            manage_text += "<b>Ожидают авторизации:</b>\n"
+            for user in unauthorized_users:
+                name = user['first_name'] or "Unknown"
+                username = f"@{user['username']}" if user['username'] else ""
+                manage_text += f"• {name} {username}\n  ID: <code>{user['user_id']}</code>\n"
+                keyboard.append([InlineKeyboardButton(
+                    f"✅ Авторизовать {name}",
+                    callback_data=f"admin_auth_{user['user_id']}"
+                )])
+            manage_text += "\n"
+        else:
+            manage_text += "Нет пользователей, ожидающих авторизации.\n\n"
+
+        if authorized_users:
+            manage_text += "<b>Авторизованные пользователи:</b>\n"
+            for user in authorized_users:
+                name = user['first_name'] or "Unknown"
+                username = f"@{user['username']}" if user['username'] else ""
+                manage_text += f"• {name} {username}\n  ID: <code>{user['user_id']}</code>\n"
+                keyboard.append([InlineKeyboardButton(
+                    f"❌ Деавторизовать {name}",
+                    callback_data=f"admin_deauth_{user['user_id']}"
+                )])
+
+        keyboard.append([InlineKeyboardButton("◀️ Назад", callback_data="admin_back")])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(manage_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
+    elif query.data.startswith("admin_auth_"):
+        target_user_id = int(query.data.replace("admin_auth_", ""))
+        db.authorize_user(target_user_id)
+        await query.answer(f"✅ Пользователь {target_user_id} авторизован!", show_alert=True)
+        # Refresh the management menu
+        await admin_callback(update, context)
+
+    elif query.data.startswith("admin_deauth_"):
+        target_user_id = int(query.data.replace("admin_deauth_", ""))
+        if target_user_id == config.ADMIN_USER_ID:
+            await query.answer("❌ Нельзя деавторизовать главного администратора!", show_alert=True)
+            return
+        db.deauthorize_user(target_user_id)
+        await query.answer(f"✅ Пользователь {target_user_id} деавторизован!", show_alert=True)
+        # Refresh the management menu
+        await admin_callback(update, context)
+
+    elif query.data == "admin_prompt_menu":
+        current_prompt = db.get_setting('system_prompt')
+
+        prompt_text = "💬 <b>Управление системным промптом</b>\n\n"
+
+        if current_prompt:
+            prompt_text += f"<b>Текущий промпт:</b>\n<code>{current_prompt[:200]}</code>"
+            if len(current_prompt) > 200:
+                prompt_text += "..."
+        else:
+            prompt_text += "Системный промпт не установлен."
+
+        keyboard = [
+            [InlineKeyboardButton("📋 Показать полностью", callback_data="admin_prompt_show")],
+            [InlineKeyboardButton("🗑️ Очистить промпт", callback_data="admin_prompt_clear")],
+            [InlineKeyboardButton("◀️ Назад", callback_data="admin_back")]
+        ]
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(prompt_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
+    elif query.data == "admin_prompt_show":
+        current_prompt = db.get_setting('system_prompt')
+
+        if current_prompt:
+            prompt_text = f"📋 <b>Системный промпт:</b>\n\n<code>{current_prompt}</code>"
+        else:
+            prompt_text = "ℹ️ Системный промпт не установлен."
+
+        keyboard = [[InlineKeyboardButton("◀️ Назад", callback_data="admin_prompt_menu")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(prompt_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
+    elif query.data == "admin_prompt_clear":
+        db.set_setting('system_prompt', '')
+        await query.answer("✅ Системный промпт очищен!", show_alert=True)
+        # Return to prompt menu
+        query.data = "admin_prompt_menu"
+        await admin_callback(update, context)
+
+    elif query.data == "admin_back":
+        # Return to main admin menu
+        keyboard = [
+            [InlineKeyboardButton("👥 Список пользователей", callback_data="admin_users")],
+            [InlineKeyboardButton("📊 Общая статистика", callback_data="admin_stats")],
+            [InlineKeyboardButton("💰 Стоимость токенов", callback_data="admin_pricing")],
+            [InlineKeyboardButton("🔧 Управление пользователями", callback_data="admin_manage_users")],
+            [InlineKeyboardButton("💬 Системный промпт", callback_data="admin_prompt_menu")],
+        ]
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            "⚙️ <b>Панель администратора</b>\n\nВыберите действие:",
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML
+        )
 
 
 async def authorize_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):

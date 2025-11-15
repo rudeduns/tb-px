@@ -1,6 +1,8 @@
 """Main Telegram bot implementation with Claude AI integration."""
 import logging
 import io
+import asyncio
+import re
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -107,6 +109,36 @@ def split_message(text: str, max_length: int = MAX_MESSAGE_LENGTH) -> list[str]:
         chunks.append(current_chunk.strip())
 
     return chunks if chunks else [text[:max_length]]
+
+
+async def keep_typing(chat, stop_event: asyncio.Event):
+    """Keep sending typing action until stopped."""
+    while not stop_event.is_set():
+        try:
+            await chat.send_action(ChatAction.TYPING)
+            await asyncio.sleep(5)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.warning(f"Error sending typing action: {e}")
+            break
+
+
+def convert_markdown_to_html(text: str) -> str:
+    """Convert Markdown formatting to Telegram HTML."""
+    # Code blocks ``` (process first to avoid affecting ** inside)
+    text = re.sub(r'```(.*?)```', r'<pre>\1</pre>', text, flags=re.DOTALL)
+
+    # Inline code `
+    text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
+
+    # Bold text **
+    text = re.sub(r'\*\*([^\*]+)\*\*', r'<b>\1</b>', text)
+
+    # Italic * (single asterisks, but not inside words)
+    text = re.sub(r'(?<!\*)\*(?!\*)([^\*]+)\*(?!\*)', r'<i>\1</i>', text)
+
+    return text
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -232,8 +264,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     db.add_user(user.id, user.username, user.first_name, user.last_name, is_authorized=True)
 
-    # Show typing indicator
-    await update.message.chat.send_action(ChatAction.TYPING)
+    # Start continuous typing indicator
+    stop_typing = asyncio.Event()
+    typing_task = asyncio.create_task(keep_typing(update.message.chat, stop_typing))
 
     try:
         chat_id = update.effective_chat.id
@@ -251,6 +284,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Send to Claude with system prompt
         response_text, input_tokens, output_tokens = claude.send_message(history, system_prompt)
 
+        # Convert Markdown to HTML formatting
+        response_text = convert_markdown_to_html(response_text)
+
         # Save to database with chat_id
         db.add_message_to_history(user_id, chat_id, "user", user_message)
         db.add_message_to_history(user_id, chat_id, "assistant", response_text)
@@ -258,7 +294,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Log usage
         cost = db.log_usage(user_id, config.CLAUDE_MODEL, input_tokens, output_tokens)
 
-        # Send response - split if too long, try with Markdown, fallback to plain text
+        # Send response - split if too long, try with HTML, fallback to plain text
         message_chunks = split_message(response_text)
 
         for i, chunk in enumerate(message_chunks):
@@ -282,6 +318,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"❌ Произошла ошибка при обработке сообщения:\n{str(e)}"
         )
+    finally:
+        # Stop typing indicator
+        stop_typing.set()
+        typing_task.cancel()
+        try:
+            await typing_task
+        except asyncio.CancelledError:
+            pass
 
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -300,7 +344,9 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     db.add_user(user.id, user.username, user.first_name, user.last_name, is_authorized=True)
 
-    await update.message.chat.send_action(ChatAction.TYPING)
+    # Start continuous typing indicator
+    stop_typing = asyncio.Event()
+    typing_task = asyncio.create_task(keep_typing(update.message.chat, stop_typing))
 
     try:
         # Get the largest photo
@@ -327,6 +373,9 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             history, bytes(photo_bytes), "jpeg", system_prompt
         )
 
+        # Convert Markdown to HTML formatting
+        response_text = convert_markdown_to_html(response_text)
+
         # Save to database with chat_id
         db.add_message_to_history(user_id, chat_id, "user", f"[Image] {caption}")
         db.add_message_to_history(user_id, chat_id, "assistant", response_text)
@@ -334,7 +383,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Log usage
         cost = db.log_usage(user_id, config.CLAUDE_MODEL, input_tokens, output_tokens)
 
-        # Send response - split if too long, try with Markdown, fallback to plain text
+        # Send response - split if too long, try with HTML, fallback to plain text
         message_chunks = split_message(response_text)
 
         for i, chunk in enumerate(message_chunks):
@@ -356,6 +405,14 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"❌ Произошла ошибка при обработке изображения:\n{str(e)}"
         )
+    finally:
+        # Stop typing indicator
+        stop_typing.set()
+        typing_task.cancel()
+        try:
+            await typing_task
+        except asyncio.CancelledError:
+            pass
 
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -370,7 +427,9 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     db.add_user(user.id, user.username, user.first_name, user.last_name, is_authorized=True)
 
-    await update.message.chat.send_action(ChatAction.TYPING)
+    # Start continuous typing indicator
+    stop_typing = asyncio.Event()
+    typing_task = asyncio.create_task(keep_typing(update.message.chat, stop_typing))
 
     document = update.message.document
 
@@ -415,6 +474,9 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             history, doc_text, system_prompt
         )
 
+        # Convert Markdown to HTML formatting
+        response_text = convert_markdown_to_html(response_text)
+
         # Save to database with chat_id
         db.add_message_to_history(user_id, chat_id, "user", f"[Document: {document.file_name}] {caption}")
         db.add_message_to_history(user_id, chat_id, "assistant", response_text)
@@ -422,7 +484,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Log usage
         cost = db.log_usage(user_id, config.CLAUDE_MODEL, input_tokens, output_tokens)
 
-        # Send response - split if too long, try with Markdown, fallback to plain text
+        # Send response - split if too long, try with HTML, fallback to plain text
         message_chunks = split_message(response_text)
 
         for i, chunk in enumerate(message_chunks):
@@ -444,6 +506,14 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"❌ Произошла ошибка при обработке документа:\n{str(e)}"
         )
+    finally:
+        # Stop typing indicator
+        stop_typing.set()
+        typing_task.cancel()
+        try:
+            await typing_task
+        except asyncio.CancelledError:
+            pass
 
 
 def main():
