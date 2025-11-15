@@ -113,15 +113,17 @@ def split_message(text: str, max_length: int = MAX_MESSAGE_LENGTH) -> list[str]:
 
 async def keep_typing(chat, stop_event: asyncio.Event):
     """Keep sending typing action until stopped."""
-    while not stop_event.is_set():
-        try:
-            await chat.send_action(ChatAction.TYPING)
+    try:
+        # Send first typing status immediately
+        await chat.send_action(ChatAction.TYPING)
+        while not stop_event.is_set():
             await asyncio.sleep(5)
-        except asyncio.CancelledError:
-            break
-        except Exception as e:
-            logger.warning(f"Error sending typing action: {e}")
-            break
+            if not stop_event.is_set():
+                await chat.send_action(ChatAction.TYPING)
+    except asyncio.CancelledError:
+        pass
+    except Exception as e:
+        logger.warning(f"Error sending typing action: {e}")
 
 
 def convert_markdown_to_html(text: str) -> str:
