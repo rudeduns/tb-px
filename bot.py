@@ -34,6 +34,21 @@ def get_active_model() -> str:
     """Get the currently active Claude model from settings, falling back to config default."""
     return db.get_setting('active_model') or config.CLAUDE_MODEL
 
+
+def build_system_prompt(active_model: str, custom_prompt: str | None) -> str:
+    """Build effective system prompt: base instructions + optional admin-set prompt.
+
+    Base always tells Claude its model identity and to answer only the latest message.
+    """
+    base = (
+        f"Ты работаешь как модель {active_model} от Anthropic. "
+        "Отвечай только на последнее сообщение пользователя — "
+        "не пересказывай и не отвечай повторно на предыдущие сообщения из истории переписки."
+    )
+    if custom_prompt:
+        return f"{base}\n\n{custom_prompt}"
+    return base
+
 # Telegram message length limit
 MAX_MESSAGE_LENGTH = 4096
 
@@ -290,11 +305,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_message = update.message.text
         history.append({"role": "user", "content": user_message})
 
-        # Get system prompt from database
-        system_prompt = db.get_setting('system_prompt')
+        # Build effective system prompt
+        active_model = get_active_model()
+        system_prompt = build_system_prompt(active_model, db.get_setting('system_prompt'))
 
         # Send to Claude with system prompt
-        active_model = get_active_model()
         response_text, input_tokens, output_tokens = claude.send_message(history, system_prompt, model=active_model)
 
         # Convert Markdown to HTML formatting
@@ -388,11 +403,11 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         history = db.get_conversation_history(user_id, chat_id, limit=10)
         history.append({"role": "user", "content": caption})
 
-        # Get system prompt from database
-        system_prompt = db.get_setting('system_prompt')
+        # Build effective system prompt
+        active_model = get_active_model()
+        system_prompt = build_system_prompt(active_model, db.get_setting('system_prompt'))
 
         # Send to Claude with image and system prompt
-        active_model = get_active_model()
         response_text, input_tokens, output_tokens = claude.send_message_with_image(
             history, bytes(photo_bytes), "jpeg", system_prompt, model=active_model
         )
@@ -507,8 +522,8 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_message = f"[Голосовое сообщение]: {transcribed_text}"
         history.append({"role": "user", "content": user_message})
 
-        system_prompt = db.get_setting('system_prompt')
         active_model = get_active_model()
+        system_prompt = build_system_prompt(active_model, db.get_setting('system_prompt'))
         response_text, input_tokens, output_tokens = claude.send_message(history, system_prompt, model=active_model)
         response_text = convert_markdown_to_html(response_text)
 
@@ -613,11 +628,11 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         history = db.get_conversation_history(user_id, chat_id, limit=5)
         history.append({"role": "user", "content": caption})
 
-        # Get system prompt from database
-        system_prompt = db.get_setting('system_prompt')
+        # Build effective system prompt
+        active_model = get_active_model()
+        system_prompt = build_system_prompt(active_model, db.get_setting('system_prompt'))
 
         # Send to Claude with document and system prompt
-        active_model = get_active_model()
         response_text, input_tokens, output_tokens = claude.send_message_with_document(
             history, doc_text, system_prompt, model=active_model
         )
