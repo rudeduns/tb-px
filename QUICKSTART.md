@@ -153,29 +153,13 @@ pct destroy 200
 
 ## Обновление бота
 
+С хоста Proxmox одной командой:
+
 ```bash
-# Войдите в контейнер
-pct enter 200
-
-# Перейдите в директорию бота
-cd /opt/telegram-bot
-
-# Сохраните .env файл
-cp .env .env.backup
-
-# Обновите код (если используете git)
-git pull
-
-# Или скачайте файлы вручную
-# curl -O https://raw.githubusercontent.com/YOUR_USERNAME/telegram-bot/main/bot.py
-# И так далее для других файлов
-
-# Обновите зависимости
-venv/bin/pip install -r requirements.txt --upgrade
-
-# Перезапустите бота
-systemctl restart telegram-bot
+bash <(curl -fsSL https://raw.githubusercontent.com/rudeduns/tb-px/main/update.sh) ВАШ_CT_ID
 ```
+
+Скрипт скачает все файлы бота, обновит зависимости и перезапустит сервис.
 
 ## Безопасность
 

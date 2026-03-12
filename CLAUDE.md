@@ -69,6 +69,9 @@ wget https://raw.githubusercontent.com/rudeduns/tb-px/main/proxmox-deploy.sh
 chmod +x proxmox-deploy.sh
 ./proxmox-deploy.sh
 
+# Update bot in existing container (one-liner from Proxmox host)
+bash <(curl -fsSL https://raw.githubusercontent.com/rudeduns/tb-px/main/update.sh) CT_ID
+
 # Install on existing Linux server
 sudo ./install.sh
 
@@ -118,6 +121,7 @@ pct exec 200 -- journalctl -u telegram-bot -f
 - `/authorize <user_id>`, `/deauthorize <user_id>` - User management
 - `/users`, `/totalstats` - Reporting
 - `/setprompt <text>`, `/showprompt` - System prompt management
+- `/model` - Live model switcher (fetches model list from Anthropic API, shows InlineKeyboard)
 - Uses callback queries for button interactions
 
 **config.py** - Configuration loader
@@ -179,6 +183,13 @@ settings: key (PK), value, updated_at
 - `get_conversation_history()` filters by `timestamp >= datetime('now', '-10 minutes')`
 - Each user has separate context in each chat
 - Context automatically expires after 10 minutes of inactivity
+
+**Active Model:**
+- Stored in `settings` table with key='active_model'
+- Admin selects via `/model` command — list fetched live from `GET /v1/models` (direct httpx, SDK-version-agnostic)
+- Falls back to `CLAUDE_MODEL` from .env if not set
+- Applied immediately to all users without restart
+- `get_active_model()` in bot.py reads the setting before every API call
 
 **System Prompt:**
 - Stored in `settings` table with key='system_prompt'
