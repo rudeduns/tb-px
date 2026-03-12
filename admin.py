@@ -8,9 +8,30 @@ from telegram.ext import (
 )
 from telegram.constants import ParseMode
 from database import Database
+from claude_client import ClaudeClient
 import config
 
 db = Database()
+claude_client = ClaudeClient()
+
+
+def _build_model_keyboard(models: list, active_model: str) -> tuple:
+    """Build model selection InlineKeyboard. Returns (text, markup)."""
+    active_name = next((name for mid, name in models if mid == active_model), active_model)
+    text = (
+        "🤖 <b>Выбор модели Claude</b>\n\n"
+        f"Текущая: <code>{active_name}</code>\n\n"
+        "Выберите модель:"
+    )
+    keyboard = []
+    for model_id, display_name in models:
+        mark = "✅ " if model_id == active_model else ""
+        keyboard.append([InlineKeyboardButton(
+            f"{mark}{display_name}",
+            callback_data=f"setmodel_{model_id}"
+        )])
+    keyboard.append([InlineKeyboardButton("◀️ Назад", callback_data="admin_back")])
+    return text, InlineKeyboardMarkup(keyboard)
 
 
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -27,6 +48,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("💰 Стоимость токенов", callback_data="admin_pricing")],
         [InlineKeyboardButton("🔧 Управление пользователями", callback_data="admin_manage_users")],
         [InlineKeyboardButton("💬 Системный промпт", callback_data="admin_prompt_menu")],
+        [InlineKeyboardButton("🤖 Сменить модель", callback_data="admin_model")],
     ]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -90,7 +112,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Токенов вывода: {stats['total_output_tokens']:,}\n"
             f"Всего токенов: {stats['total_input_tokens'] + stats['total_output_tokens']:,}\n\n"
             f"💰 <b>Общая стоимость:</b> ${stats['total_cost']:.4f}\n\n"
-            f"Используемая модель: <code>{config.CLAUDE_MODEL}</code>"
+            f"Используемая модель: <code>{db.get_setting('active_model') or config.CLAUDE_MODEL}</code>"
         )
 
         keyboard = [[InlineKeyboardButton("◀️ Назад", callback_data="admin_back")]]
@@ -106,9 +128,10 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pricing_text += f"  Ввод: ${prices['input']:.2f} / 1M токенов\n"
             pricing_text += f"  Вывод: ${prices['output']:.2f} / 1M токенов\n\n"
 
-        current = config.CLAUDE_PRICING.get(config.CLAUDE_MODEL)
+        active_model = db.get_setting('active_model') or config.CLAUDE_MODEL
+        current = config.CLAUDE_PRICING.get(active_model)
         if current:
-            pricing_text += f"<b>Текущая модель:</b> <code>{config.CLAUDE_MODEL}</code>\n"
+            pricing_text += f"<b>Текущая модель:</b> <code>{active_model}</code>\n"
             pricing_text += f"Ввод: ${current['input']:.2f} / 1M\n"
             pricing_text += f"Вывод: ${current['output']:.2f} / 1M"
 
@@ -215,6 +238,15 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         query.data = "admin_prompt_menu"
         await admin_callback(update, context)
 
+    elif query.data == "admin_model":
+        active_model = db.get_setting('active_model') or config.CLAUDE_MODEL
+        models = await claude_client.get_available_models()
+        if not models:
+            await query.answer("❌ Не удалось получить список моделей от Anthropic", show_alert=True)
+            return
+        text, markup = _build_model_keyboard(models, active_model)
+        await query.edit_message_text(text, reply_markup=markup, parse_mode=ParseMode.HTML)
+
     elif query.data == "admin_back":
         # Return to main admin menu
         keyboard = [
@@ -223,6 +255,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("💰 Стоимость токенов", callback_data="admin_pricing")],
             [InlineKeyboardButton("🔧 Управление пользователями", callback_data="admin_manage_users")],
             [InlineKeyboardButton("💬 Системный промпт", callback_data="admin_prompt_menu")],
+            [InlineKeyboardButton("🤖 Сменить модель", callback_data="admin_model")],
         ]
 
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -361,7 +394,7 @@ async def total_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"Токенов вывода: {stats['total_output_tokens']:,}\n"
         f"Всего токенов: {stats['total_input_tokens'] + stats['total_output_tokens']:,}\n\n"
         f"💰 <b>Общая стоимость:</b> ${stats['total_cost']:.4f}\n\n"
-        f"Используемая модель: <code>{config.CLAUDE_MODEL}</code>"
+        f"Используемая модель: <code>{db.get_setting('active_model') or config.CLAUDE_MODEL}</code>"
     )
 
     await update.message.reply_text(stats_text, parse_mode=ParseMode.HTML)
@@ -422,6 +455,50 @@ async def show_prompt_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("ℹ️ Системный промпт не установлен.")
 
 
+async def model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/model command — show model selection for admin."""
+    user_id = update.effective_user.id
+
+    if not db.is_admin(user_id):
+        await update.message.reply_text("❌ У вас нет прав администратора.")
+        return
+
+    active_model = db.get_setting('active_model') or config.CLAUDE_MODEL
+    models = await claude_client.get_available_models()
+
+    if not models:
+        await update.message.reply_text(
+            "❌ Не удалось получить список моделей от Anthropic.\n"
+            f"Текущая модель: <code>{active_model}</code>",
+            parse_mode=ParseMode.HTML
+        )
+        return
+
+    text, markup = _build_model_keyboard(models, active_model)
+    await update.message.reply_text(text, reply_markup=markup, parse_mode=ParseMode.HTML)
+
+
+async def set_model_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle model selection button press."""
+    query = update.callback_query
+    await query.answer()
+
+    user_id = query.from_user.id
+    if not db.is_admin(user_id):
+        await query.edit_message_text("❌ У вас нет прав администратора.")
+        return
+
+    selected_model = query.data.replace("setmodel_", "", 1)
+    db.set_setting('active_model', selected_model)
+
+    await query.edit_message_text(
+        f"✅ <b>Модель изменена</b>\n\n"
+        f"Теперь используется: <code>{selected_model}</code>\n\n"
+        "Изменение вступает в силу немедленно для всех пользователей.",
+        parse_mode=ParseMode.HTML
+    )
+
+
 def register_admin_handlers(application: Application):
     """Register all admin command handlers."""
     application.add_handler(CommandHandler("admin", admin_panel))
@@ -431,4 +508,6 @@ def register_admin_handlers(application: Application):
     application.add_handler(CommandHandler("totalstats", total_stats_command))
     application.add_handler(CommandHandler("setprompt", set_prompt_command))
     application.add_handler(CommandHandler("showprompt", show_prompt_command))
+    application.add_handler(CommandHandler("model", model_command))
     application.add_handler(CallbackQueryHandler(admin_callback, pattern="^admin_"))
+    application.add_handler(CallbackQueryHandler(set_model_callback, pattern="^setmodel_"))

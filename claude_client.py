@@ -1,6 +1,7 @@
 """Claude API client for handling AI conversations."""
 import anthropic
 import base64
+import httpx
 from typing import List, Dict, Optional
 import config
 
@@ -13,10 +14,34 @@ class ClaudeClient:
         self.model = config.CLAUDE_MODEL
         self.max_tokens = config.MAX_TOKENS
 
+    async def get_available_models(self) -> list:
+        """Fetch available Claude models live from Anthropic API.
+
+        Returns list of (model_id, display_name) tuples, newest first.
+        Falls back to empty list on any error.
+        """
+        try:
+            async with httpx.AsyncClient() as http:
+                r = await http.get(
+                    "https://api.anthropic.com/v1/models",
+                    headers={
+                        "x-api-key": config.CLAUDE_API_KEY,
+                        "anthropic-version": "2023-06-01",
+                    },
+                    timeout=10,
+                )
+                if r.status_code == 200:
+                    data = r.json().get("data", [])
+                    return [(m["id"], m.get("display_name", m["id"])) for m in data]
+        except Exception:
+            pass
+        return []
+
     def send_message(
         self,
         messages: List[Dict[str, str]],
-        system_prompt: Optional[str] = None
+        system_prompt: Optional[str] = None,
+        model: Optional[str] = None
     ) -> tuple[str, int, int]:
         """
         Send a message to Claude and get response.
@@ -30,7 +55,7 @@ class ClaudeClient:
         """
         try:
             kwargs = {
-                "model": self.model,
+                "model": model or self.model,
                 "max_tokens": self.max_tokens,
                 "messages": messages
             }
@@ -59,7 +84,8 @@ class ClaudeClient:
         messages: List[Dict],
         image_data: bytes,
         image_format: str,
-        system_prompt: Optional[str] = None
+        system_prompt: Optional[str] = None,
+        model: Optional[str] = None
     ) -> tuple[str, int, int]:
         """
         Send a message with an image to Claude.
@@ -110,7 +136,7 @@ class ClaudeClient:
             })
 
             kwargs = {
-                "model": self.model,
+                "model": model or self.model,
                 "max_tokens": self.max_tokens,
                 "messages": messages_copy
             }
@@ -138,7 +164,8 @@ class ClaudeClient:
         self,
         messages: List[Dict],
         document_text: str,
-        system_prompt: Optional[str] = None
+        system_prompt: Optional[str] = None,
+        model: Optional[str] = None
     ) -> tuple[str, int, int]:
         """
         Send a message with document content to Claude.
@@ -168,4 +195,4 @@ class ClaudeClient:
             "content": full_message
         })
 
-        return self.send_message(messages_copy, system_prompt)
+        return self.send_message(messages_copy, system_prompt, model=model)

@@ -29,6 +29,11 @@ logger = logging.getLogger(__name__)
 db = Database()
 claude = ClaudeClient()
 
+
+def get_active_model() -> str:
+    """Get the currently active Claude model from settings, falling back to config default."""
+    return db.get_setting('active_model') or config.CLAUDE_MODEL
+
 # Telegram message length limit
 MAX_MESSAGE_LENGTH = 4096
 
@@ -289,7 +294,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         system_prompt = db.get_setting('system_prompt')
 
         # Send to Claude with system prompt
-        response_text, input_tokens, output_tokens = claude.send_message(history, system_prompt)
+        active_model = get_active_model()
+        response_text, input_tokens, output_tokens = claude.send_message(history, system_prompt, model=active_model)
 
         # Convert Markdown to HTML formatting
         response_text = convert_markdown_to_html(response_text)
@@ -299,7 +305,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.add_message_to_history(user_id, chat_id, "assistant", response_text)
 
         # Log usage
-        cost = db.log_usage(user_id, config.CLAUDE_MODEL, input_tokens, output_tokens)
+        cost = db.log_usage(user_id, active_model, input_tokens, output_tokens)
 
         # Send response - split if too long, try with HTML, fallback to plain text
         message_chunks = split_message(response_text)
@@ -386,8 +392,9 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         system_prompt = db.get_setting('system_prompt')
 
         # Send to Claude with image and system prompt
+        active_model = get_active_model()
         response_text, input_tokens, output_tokens = claude.send_message_with_image(
-            history, bytes(photo_bytes), "jpeg", system_prompt
+            history, bytes(photo_bytes), "jpeg", system_prompt, model=active_model
         )
 
         # Convert Markdown to HTML formatting
@@ -398,7 +405,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.add_message_to_history(user_id, chat_id, "assistant", response_text)
 
         # Log usage
-        cost = db.log_usage(user_id, config.CLAUDE_MODEL, input_tokens, output_tokens)
+        cost = db.log_usage(user_id, active_model, input_tokens, output_tokens)
 
         # Send response - split if too long, try with HTML, fallback to plain text
         message_chunks = split_message(response_text)
@@ -501,12 +508,13 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         history.append({"role": "user", "content": user_message})
 
         system_prompt = db.get_setting('system_prompt')
-        response_text, input_tokens, output_tokens = claude.send_message(history, system_prompt)
+        active_model = get_active_model()
+        response_text, input_tokens, output_tokens = claude.send_message(history, system_prompt, model=active_model)
         response_text = convert_markdown_to_html(response_text)
 
         db.add_message_to_history(user_id, chat_id, "user", user_message)
         db.add_message_to_history(user_id, chat_id, "assistant", response_text)
-        cost = db.log_usage(user_id, config.CLAUDE_MODEL, input_tokens, output_tokens)
+        cost = db.log_usage(user_id, active_model, input_tokens, output_tokens)
 
         # Send transcription note + response
         await update.message.reply_text(
@@ -609,8 +617,9 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         system_prompt = db.get_setting('system_prompt')
 
         # Send to Claude with document and system prompt
+        active_model = get_active_model()
         response_text, input_tokens, output_tokens = claude.send_message_with_document(
-            history, doc_text, system_prompt
+            history, doc_text, system_prompt, model=active_model
         )
 
         # Convert Markdown to HTML formatting
@@ -621,7 +630,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.add_message_to_history(user_id, chat_id, "assistant", response_text)
 
         # Log usage
-        cost = db.log_usage(user_id, config.CLAUDE_MODEL, input_tokens, output_tokens)
+        cost = db.log_usage(user_id, active_model, input_tokens, output_tokens)
 
         # Send response - split if too long, try with HTML, fallback to plain text
         message_chunks = split_message(response_text)
