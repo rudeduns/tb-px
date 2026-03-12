@@ -3,6 +3,7 @@ import logging
 import io
 import asyncio
 import re
+import httpx
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -155,12 +156,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    voice_line = "\n• Отправлять голосовые сообщения (распознавание речи)" if config.WHISPER_URL else ""
     await update.message.reply_text(
         f"👋 Привет, {user.first_name}!\n\n"
         "Я бот с интеграцией Claude AI. Вы можете:\n"
         "• Задавать любые вопросы\n"
         "• Отправлять картинки для анализа\n"
-        "• Отправлять текстовые файлы\n\n"
+        "• Отправлять текстовые файлы"
+        f"{voice_line}\n\n"
         "Команды:\n"
         "/clear - Очистить историю разговора\n"
         "/help - Показать справку\n"
@@ -187,7 +190,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "<b>Возможности:</b>\n"
         "• Отправьте текстовое сообщение - получите ответ от Claude\n"
         "• Отправьте картинку с подписью - Claude проанализирует её\n"
-        "• Отправьте текстовый файл - Claude прочитает и ответит\n\n"
+        "• Отправьте текстовый файл - Claude прочитает и ответит\n"
+        + ("• Отправьте голосовое сообщение - будет распознано и отправлено Claude\n" if config.WHISPER_URL else "")
+        + "\n"
         "<b>Особенности:</b>\n"
         "• Бот помнит контекст разговора\n"
         "• Используется модель: " + config.CLAUDE_MODEL
@@ -434,6 +439,118 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle voice and audio messages via Whisper STT."""
+    if not config.WHISPER_URL:
+        return
+
+    user_id = update.effective_user.id
+
+    # In groups, only respond if bot is mentioned
+    if not is_bot_mentioned(update, context):
+        return
+
+    if not db.is_authorized(user_id):
+        await update.message.reply_text(
+            "❌ У вас нет доступа к боту.\n"
+            f"Ваш ID: <code>{user_id}</code>\n"
+            "Отправьте этот ID администратору.",
+            parse_mode=ParseMode.HTML
+        )
+        return
+
+    # Send typing status immediately
+    await update.message.chat.send_action(ChatAction.TYPING)
+
+    # Start continuous typing indicator
+    stop_typing = asyncio.Event()
+    typing_task = asyncio.create_task(keep_typing(update.message.chat, stop_typing))
+
+    try:
+        voice = update.message.voice or update.message.audio
+        file = await context.bot.get_file(voice.file_id)
+        ogg_bytes = await file.download_as_bytearray()
+
+        # Send to Whisper for transcription
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"{config.WHISPER_URL}/transcribe",
+                files={"file": ("voice.ogg", bytes(ogg_bytes), "audio/ogg")},
+                timeout=60,
+            )
+        r.raise_for_status()
+        transcribed_text = r.json()["text"].strip()
+
+        if not transcribed_text:
+            stop_typing.set()
+            typing_task.cancel()
+            await update.message.reply_text("❌ Не удалось распознать речь.")
+            return
+
+        logger.info(f"User {user_id} - Voice transcribed: {transcribed_text[:100]}")
+
+        # Process transcribed text through Claude as a regular message
+        user_id = update.effective_user.id
+        user = update.effective_user
+        db.add_user(user.id, user.username, user.first_name, user.last_name, is_authorized=True)
+
+        chat_id = update.effective_chat.id
+        history = db.get_conversation_history(user_id, chat_id, limit=10)
+
+        user_message = f"[Голосовое сообщение]: {transcribed_text}"
+        history.append({"role": "user", "content": user_message})
+
+        system_prompt = db.get_setting('system_prompt')
+        response_text, input_tokens, output_tokens = claude.send_message(history, system_prompt)
+        response_text = convert_markdown_to_html(response_text)
+
+        db.add_message_to_history(user_id, chat_id, "user", user_message)
+        db.add_message_to_history(user_id, chat_id, "assistant", response_text)
+        cost = db.log_usage(user_id, config.CLAUDE_MODEL, input_tokens, output_tokens)
+
+        # Send transcription note + response
+        await update.message.reply_text(
+            f"🎤 <i>{transcribed_text}</i>",
+            parse_mode=ParseMode.HTML
+        )
+
+        message_chunks = split_message(response_text)
+        for i, chunk in enumerate(message_chunks):
+            if i > 0:
+                await asyncio.sleep(0.5)
+            try:
+                await update.message.reply_text(chunk, parse_mode=ParseMode.HTML)
+            except Exception as parse_error:
+                logger.warning(f"Message send error for user {user_id} (voice): {parse_error}")
+                try:
+                    await update.message.reply_text(chunk)
+                except Exception as e:
+                    logger.error(f"Failed to send chunk {i+1}: {e}")
+                    await update.message.reply_text(chunk[:MAX_MESSAGE_LENGTH])
+
+        stop_typing.set()
+        typing_task.cancel()
+        try:
+            await typing_task
+        except asyncio.CancelledError:
+            pass
+
+        logger.info(f"User {user_id} - Voice - Tokens: {input_tokens}+{output_tokens}, Cost: ${cost:.4f}")
+
+    except httpx.HTTPError as e:
+        logger.error(f"Whisper API error: {e}")
+        stop_typing.set()
+        typing_task.cancel()
+        await update.message.reply_text("❌ Ошибка связи с Whisper сервером.")
+    except Exception as e:
+        logger.error(f"Error handling voice: {e}")
+        stop_typing.set()
+        typing_task.cancel()
+        await update.message.reply_text(
+            f"❌ Произошла ошибка при обработке голосового сообщения:\n{str(e)}"
+        )
+
+
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle document messages."""
     user_id = update.effective_user.id
@@ -571,6 +688,7 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+    application.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
 
     # Start bot
     logger.info("Bot started successfully")

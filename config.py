@@ -17,6 +17,9 @@ MAX_TOKENS = int(os.getenv("MAX_TOKENS", "4096"))
 # Database configuration
 DATABASE_PATH = os.getenv("DATABASE_PATH", "bot_data.db")
 
+# Whisper STT configuration (optional)
+WHISPER_URL = os.getenv("WHISPER_URL")  # None if not set — voice messages disabled
+
 # Claude pricing (per million tokens) - update as needed
 CLAUDE_PRICING = {
     "claude-3-5-sonnet-20241022": {"input": 3.00, "output": 15.00},

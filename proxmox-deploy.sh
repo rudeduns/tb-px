@@ -159,6 +159,19 @@ done
 read -p "Enter Claude model [claude-3-5-sonnet-20241022]: " CLAUDE_MODEL
 CLAUDE_MODEL=${CLAUDE_MODEL:-claude-3-5-sonnet-20241022}
 
+# Optional: Whisper STT server
+echo ""
+echo -e "${YELLOW}Whisper is an optional speech-to-text server for voice messages.${NC}"
+echo -e "${YELLOW}Leave empty to disable voice message support.${NC}"
+read -p "Enter Whisper server IP:PORT (e.g. 192.168.1.86:8765, or Enter to skip): " WHISPER_INPUT
+if [ -n "$WHISPER_INPUT" ]; then
+    WHISPER_URL="http://$WHISPER_INPUT"
+    print_info "Whisper URL: $WHISPER_URL"
+else
+    WHISPER_URL=""
+    print_info "Whisper not configured — voice messages disabled"
+fi
+
 print_step "Summary"
 echo "Container Configuration:"
 echo "  ID: $CT_ID"
@@ -173,6 +186,11 @@ echo "  Telegram Bot Token: ${TELEGRAM_BOT_TOKEN:0:10}..."
 echo "  Claude API Key: ${CLAUDE_API_KEY:0:10}..."
 echo "  Admin User ID: $ADMIN_USER_ID"
 echo "  Claude Model: $CLAUDE_MODEL"
+if [ -n "$WHISPER_URL" ]; then
+    echo "  Whisper URL: $WHISPER_URL"
+else
+    echo "  Whisper: disabled"
+fi
 echo ""
 
 read -p "Proceed with installation? (yes/no): " CONFIRM
@@ -300,6 +318,9 @@ CLAUDE_MODEL=$CLAUDE_MODEL
 
 # Maximum tokens per response
 MAX_TOKENS=4096
+
+# Whisper STT server URL (empty = voice messages disabled)
+WHISPER_URL=$WHISPER_URL
 EOF"
 
 # Create service user

@@ -8,6 +8,7 @@ This is a Telegram bot with Claude AI integration that supports:
 - Text conversations with context memory
 - Image analysis via Claude Vision
 - Text file processing
+- Voice messages via Whisper STT (optional, requires local Whisper server)
 - User authorization system with admin controls
 - Token usage tracking and cost calculation
 - Group chat support (responds only when mentioned via @ or reply)
@@ -199,6 +200,7 @@ ADMIN_USER_ID - Telegram user ID (get from @userinfobot)
 CLAUDE_MODEL - Default: claude-3-5-sonnet-20241022
 MAX_TOKENS - Default: 4096
 DATABASE_PATH - Default: bot_data.db
+WHISPER_URL - Optional: http://IP:PORT of Whisper STT server (voice messages disabled if not set)
 ```
 
 ## Important Implementation Details
@@ -232,6 +234,19 @@ DATABASE_PATH - Default: bot_data.db
 - Max size: 1MB
 - UTF-8 decoding with latin-1 fallback
 - Document content prepended to user's question
+
+### Voice Message Processing (Whisper STT)
+- Only active when `WHISPER_URL` is set in `.env`
+- Supports Telegram `voice` and `audio` message types
+- Flow: download `.ogg` → POST to `WHISPER_URL/transcribe` → get text → send to Claude
+- Bot replies with transcription (italic) + Claude's response
+- Timeout: 60 seconds per request
+- If `WHISPER_URL` is not set, voice messages are silently ignored (no error to user)
+- Deploy your own Whisper server with [faster-whisper](https://github.com/SYSTRAN/faster-whisper) + FastAPI
+  - Endpoint: `POST /transcribe` — multipart `file`, returns `{"text": "...", "language": "..."}`
+  - Endpoint: `GET /health` — healthcheck
+
+**Proxmox deployment:** `proxmox-deploy.sh` prompts for Whisper server `IP:PORT` (e.g. `192.168.1.86:8765`). Press Enter to skip — bot deploys without voice support.
 
 ### Error Handling
 - All handlers wrapped in try/except
